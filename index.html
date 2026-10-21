@@ -1179,7 +1179,7 @@ V.settings = function(){
     '<button class="btn pri" data-act="saveName">Kaydet</button></div>' + logoCard() : '') +
   (adm ? usersCard() : '') +
   (adm ? '<div class="card"><h3>Yedekleme</h3><p class="muted" style="margin-top:0">Veriler bu tarayıcıda saklanır. Tarayıcı verisini temizlerseniz silinir; bu yüzden düzenli olarak yedek alın. Yedek kullanıcıları ve şifre özetlerini de içerir, güvenli bir yerde saklayın.</p>' +
-    '<div class="row-end" style="justify-content:flex-start;margin-bottom:10px"><button class="btn" data-act="downloadBackup">Yedek dosyası indir</button><button class="btn" data-act="exportData">Yedek metni oluştur</button><button class="btn" data-act="importData">Yedekten geri yükle</button></div>' +
+    '<div class="row-end" style="justify-content:flex-start;margin-bottom:10px"><button class="btn" data-act="downloadBackup">Yedek dosyası indir</button><button class="btn" data-act="exportData">Yedek metni oluştur</button><label class="btn" style="cursor:pointer;margin:0">Dosyadan geri yükle<input type="file" id="bkfile" accept=".json,application/json,text/plain" style="display:none"></label><button class="btn" data-act="importData">Kutudaki metinden geri yükle</button></div>' +
     '<textarea id="bk" rows="5" placeholder="Yedek metni burada görünür. Geri yüklemek için yedeği buraya yapıştırın."></textarea></div>' : '') +
   '<div class="card"><h3>Görünüm' + (adm ? ' ve veri' : '') + '</h3><div class="row-end" style="justify-content:flex-start"><button class="btn" data-act="theme">' + (dark ? 'Açık tema' : 'Koyu tema') + '</button>' + (adm ? '<button class="btn" data-act="demo">Örnek veri yükle</button><button class="btn danger" data-act="wipe">Tüm verileri sil</button>' : '') + '</div></div>';
 };
@@ -1287,12 +1287,30 @@ A.saveName = function(){
   commit(); toast('Kaydedildi');
 };
 A.exportData = function(){ var t = $('#bk'); t.value = JSON.stringify(db); t.select(); try{ navigator.clipboard.writeText(t.value); toast('Yedek metni kopyalandı'); }catch(e){ toast('Metni seçip kopyalayın'); } };
+function restoreBackup(txt, skipConfirm){
+  txt = String(txt || '').replace(/^\uFEFF/, '').trim();
+  if(!txt){ toast('Yedek boş görünüyor', 'err'); return; }
+  var o; try{ o = JSON.parse(txt); }catch(e){ toast('Yedek okunamadı. Doğru dosyayı seçtiğinizden emin olun.', 'err'); return; }
+  if(!o || !Array.isArray(o.products) || !Array.isArray(o.docs)){ toast('Bu dosya geçerli bir yedek değil', 'err'); return; }
+  var go = function(){ db = Object.assign(defaults(), o); ensureAttrVals(); ensureUserPerms(); if(!cur()) setSess(''); commit(); toast('Yedek yüklendi'); };
+  if(skipConfirm) go(); else confirmBox('Mevcut veriler silinip yedek geri yüklenecek.', go, 'Geri yükle');
+}
+function readBackupFile(file, fromSetup){
+  if(!file) return;
+  if(file.size > 30 * 1024 * 1024){ toast('Dosya çok büyük', 'err'); return; }
+  var fr = new FileReader();
+  fr.onerror = function(){ toast('Dosya okunamadı', 'err'); };
+  fr.onload = function(){
+    var txt = String(fr.result || '');
+    if(fromSetup) restoreBackup(txt, !(db.products.length || db.docs.length));
+    else { var ta = $('#bk'); if(ta) ta.value = txt; restoreBackup(txt, false); }
+  };
+  fr.readAsText(file);
+}
 A.importData = function(){
   var txt = $('#bk').value.trim();
   if(!txt){ toast('Önce yedek metnini kutuya yapıştırın', 'err'); return; }
-  var o; try{ o = JSON.parse(txt); }catch(e){ toast('Yedek metni okunamadı', 'err'); return; }
-  if(!o || !Array.isArray(o.products) || !Array.isArray(o.docs)){ toast('Geçerli bir yedek değil', 'err'); return; }
-  confirmBox('Mevcut veriler silinip yedek geri yüklenecek.', function(){ db = Object.assign(defaults(), o); ensureAttrVals(); ensureUserPerms(); if(!cur()) setSess(''); commit(); toast('Yedek yüklendi'); }, 'Geri yükle');
+  restoreBackup(txt, false);
 };
 function curTheme(){
   var a = document.documentElement.getAttribute('data-theme');
@@ -1389,6 +1407,11 @@ document.addEventListener('change', function(e){
   if(t.dataset.rep){ state.rep[t.dataset.rep] = t.value; render(); return; }
   if(t.dataset.sf !== undefined){ if(t.dataset.sf === 'st') state.sq.st = t.value; else state.sq.attrs[+t.dataset.sf] = t.value; stRefresh(); return; }
   if(t.dataset.sp){ state.stockPid = t.value; render(); return; }
+  if(t.id === 'bkfile' || t.id === 'bkfile2'){
+    var allowed = t.id === 'bkfile2' ? !db.users.length : can('admin');
+    if(allowed) readBackupFile(t.files && t.files[0], t.id === 'bkfile2');
+    t.value = ''; return;
+  }
   if(t.id === 'logofile'){ if(can('settings.edit')) loadLogo(t.files && t.files[0]); t.value = ''; return; }
   if(t.dataset.pk){ permSync(t); return; }
   if(t.name === 'role' && $('#permbox')){ $('#permbox').hidden = t.value === 'admin'; return; }
@@ -2254,7 +2277,9 @@ function setupView(){
   return '<div class="card login">' + logoBlock() + '<h2>İlk kurulum</h2><p class="muted" style="margin-top:4px">Yönetici hesabını oluşturun. Mevcut kayıtlarınız varsa korunur.</p>' +
     '<form id="sf">' + fld('İşletme adı', '<input name="biz" placeholder="İsteğe bağlı">') + fld('Ad soyad', '<input name="fn" required>') + fld('Kullanıcı adı', '<input name="u" autocomplete="username" autocapitalize="none" required>') +
     '<div class="cols">' + fld('Şifre', '<input name="p" type="password" autocomplete="new-password" required>') + fld('Şifre (tekrar)', '<input name="p2" type="password" autocomplete="new-password" required>') + '</div>' +
-    '<div class="err-t" id="lerr"></div><button class="btn pri" style="width:100%">Kurulumu tamamla</button></form></div>';
+    '<div class="err-t" id="lerr"></div><button class="btn pri" style="width:100%">Kurulumu tamamla</button></form>' +
+    '<div class="muted" style="margin:16px 0 8px;text-align:center">Başka bir cihazdaki kayıtlarınızı taşıyorsanız</div>' +
+    '<label class="btn" style="display:block;text-align:center;cursor:pointer;margin:0">Yedek dosyasından başla<input type="file" id="bkfile2" accept=".json,application/json,text/plain" style="display:none"></label></div>';
 }
 document.addEventListener('submit', function(e){
   var f = e.target;
