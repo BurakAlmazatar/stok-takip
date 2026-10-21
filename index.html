@@ -192,6 +192,7 @@ label.f>input,label.f>select,label.f>textarea{margin-top:4px;font-weight:400}
 <script>
 /* ---------- Veri ---------- */
 var KEY = 'stokcari_v1';
+var APP_VERSION = '2026.10.21-2 (dosyadan geri yükleme)';
 function defaults(){ return {products:[],caris:[],docs:[],payments:[],moves:[],counters:{sale:0,purchase:0},seq:1,users:[],campaigns:[],settings:{name:'',phone:'',address:'',taxNo:'',footer:'',logo:'',logoRcpt:false,attrVals:[[],[],[],[],[]]}}; }
 function load(){
   try{ var s = localStorage.getItem(KEY); if(s){ var o = JSON.parse(s); return Object.assign(defaults(), o); } }catch(e){}
@@ -2247,8 +2248,8 @@ A.delUser = function(d){
 A.myAccount = function(){
   var u = cur(); if(!u) return;
   modal('Hesabım',
-    '<div class="hint"><b>' + esc(u.name) + '</b> · ' + esc(u.username) + ' · ' + (u.role === 'admin' ? 'Yönetici' : 'Personel') + '</div>' +
-    '<div class="row-end" style="justify-content:flex-start;margin:0 0 14px"><button type="button" class="btn danger" data-act="logout">Oturumu kapat</button><button type="button" class="btn" data-act="theme">Tema değiştir</button></div>' +
+    '<div class="hint"><b>' + esc(u.name) + '</b> · ' + esc(u.username) + ' · ' + (u.role === 'admin' ? 'Yönetici' : 'Personel') + '<br><span class="muted">Sürüm: ' + esc(APP_VERSION) + '</span></div>' +
+    '<div class="row-end" style="justify-content:flex-start;margin:0 0 14px"><button type="button" class="btn danger" data-act="logout">Oturumu kapat</button><button type="button" class="btn" data-act="theme">Tema değiştir</button><button type="button" class="btn" data-act="hardRefresh">Uygulamayı yenile</button></div>' +
     '<h3 style="font-size:15px">Şifre değiştir</h3>' +
     fld('Mevcut şifre', '<input name="cp" type="password" autocomplete="current-password">') +
     '<div class="cols">' + fld('Yeni şifre', '<input name="np" type="password" autocomplete="new-password">') + fld('Yeni şifre (tekrar)', '<input name="np2" type="password" autocomplete="new-password">') + '</div>',
@@ -2264,6 +2265,20 @@ A.myAccount = function(){
       return false;
     }, 'Şifreyi kaydet');
 };
+/* Uygulama dosyalarının önbelleğini temizleyip sayfayı yeniler. Kayıtlara (tarayıcı deposu) dokunmaz. */
+A.hardRefresh = async function(){
+  try{
+    if(navigator.serviceWorker && navigator.serviceWorker.getRegistrations){
+      var regs = await navigator.serviceWorker.getRegistrations();
+      for(var i = 0; i < regs.length; i++) await regs[i].unregister();
+    }
+    if(window.caches && caches.keys){
+      var ks = await caches.keys();
+      for(var j = 0; j < ks.length; j++) await caches.delete(ks[j]);
+    }
+  }catch(e){}
+  try{ location.reload(); }catch(e){}
+};
 A.logout = function(){ setSess(''); state.ed = {sale:null, purchase:null}; state.cariId = null; state.tab = 'panel'; closeModal(); render(); };
 
 /* ---------- Giriş ve ilk kurulum ---------- */
@@ -2271,7 +2286,7 @@ var loginTries = 0, lockUntil = 0;
 function loginView(){
   return '<div class="card login">' + logoBlock() + '<h2>' + esc((db.settings && db.settings.name) || 'Stok ve Cari Takip') + '</h2><p class="muted" style="margin-top:4px">Devam etmek için giriş yapın.</p>' +
     '<form id="lf">' + fld('Kullanıcı adı', '<input name="u" autocomplete="username" autocapitalize="none" required>') + fld('Şifre', '<input name="p" type="password" autocomplete="current-password" required>') +
-    '<div class="err-t" id="lerr"></div><button class="btn pri" style="width:100%">Giriş yap</button></form></div>';
+    '<div class="err-t" id="lerr"></div><button class="btn pri" style="width:100%">Giriş yap</button></form><div class="muted" style="text-align:center;font-size:12px;margin-top:14px">Sürüm ' + esc(APP_VERSION) + '</div></div>';
 }
 function setupView(){
   return '<div class="card login">' + logoBlock() + '<h2>İlk kurulum</h2><p class="muted" style="margin-top:4px">Yönetici hesabını oluşturun. Mevcut kayıtlarınız varsa korunur.</p>' +
@@ -2279,7 +2294,7 @@ function setupView(){
     '<div class="cols">' + fld('Şifre', '<input name="p" type="password" autocomplete="new-password" required>') + fld('Şifre (tekrar)', '<input name="p2" type="password" autocomplete="new-password" required>') + '</div>' +
     '<div class="err-t" id="lerr"></div><button class="btn pri" style="width:100%">Kurulumu tamamla</button></form>' +
     '<div class="muted" style="margin:16px 0 8px;text-align:center">Başka bir cihazdaki kayıtlarınızı taşıyorsanız</div>' +
-    '<label class="btn" style="display:block;text-align:center;cursor:pointer;margin:0">Yedek dosyasından başla<input type="file" id="bkfile2" accept=".json,application/json,text/plain" style="display:none"></label></div>';
+    '<label class="btn" style="display:block;text-align:center;cursor:pointer;margin:0">Yedek dosyasından başla<input type="file" id="bkfile2" accept=".json,application/json,text/plain" style="display:none"></label><div class="muted" style="text-align:center;font-size:12px;margin-top:14px">Sürüm ' + esc(APP_VERSION) + '</div></div>';
 }
 document.addEventListener('submit', function(e){
   var f = e.target;
