@@ -1,0 +1,52 @@
+STOK VE CARİ TAKİP - GITHUB PAGES KURULUMU
+==========================================
+
+Bu klasördeki dosyaların hepsi GitHub'a yüklenecek:
+
+  index.html               Uygulamanın kendisi
+  manifest.webmanifest     Uygulamanın adı, rengi ve simgeleri
+  sw.js                    İnternet olmadan açılmasını sağlar
+  icon-192.png             Uygulama simgesi
+  icon-512.png             Uygulama simgesi (büyük)
+  icon-maskable-512.png    Android'in yuvarlak/kare kırptığı simge
+  apple-touch-icon.png     iPhone ana ekran simgesi
+  favicon-32.png           Tarayıcı sekmesi simgesi
+
+1) GITHUB'A YÜKLEME
+   - github.com üzerinde "New repository" ile yeni bir depo açın (örnek ad: stok-takip).
+   - Depoyu "Public" yapın. (Veriler depoda değil, kullanıcıların kendi tarayıcısında durur.
+     Depoda yalnızca uygulama dosyaları olur.)
+   - "Add file" > "Upload files" ile bu klasördeki 8 dosyayı sürükleyin ve "Commit changes" deyin.
+     ZIP dosyasını olduğu gibi yüklemeyin, önce klasöre çıkarın ve içindeki dosyaları yükleyin.
+
+2) YAYINA ALMA
+   - Depoda Settings > Pages bölümüne girin.
+   - "Build and deployment" altında Source: "Deploy from a branch" seçin.
+   - Branch: "main", klasör: "/ (root)" seçip Save deyin.
+   - 1-2 dakika sonra sayfanın üstünde adres görünür:
+        https://KULLANICIADINIZ.github.io/stok-takip/
+   - Bu adres tüm bilgisayarlardan ve telefonlardan açılır.
+
+3) TELEFONA UYGULAMA GİBİ EKLEME
+   Android (Chrome):  Adresi açın > sağ üst üç nokta menüsü > "Uygulamayı yükle" (veya "Ana ekrana ekle").
+   iPhone (Safari):   Adresi Safari'de açın > Paylaş düğmesi > "Ana Ekrana Ekle".
+   Bilgisayar (Chrome/Edge): Adres çubuğunun sağındaki "Yükle" simgesi veya menüden "Uygulamayı yükle".
+   İlk açılışı internet varken yapın. Sonrasında uygulama internet olmadan da açılır.
+
+4) GÜNCELLEME
+   - Yeni sürümde yalnızca index.html dosyasını değiştirmeniz yeterlidir:
+     depoda index.html > kalem simgesi yerine "Add file > Upload files" ile aynı adlı dosyayı yükleyin.
+   - Uygulamayı kapatıp açınca (ya da sayfayı yenileyince) yeni sürüm gelir.
+     Kayıtlarınız silinmez, çünkü tarayıcıda durur.
+
+ÖNEMLİ NOTLAR
+   - Kayıtlar her cihazın kendi tarayıcısında ayrı tutulur. Bilgisayardaki kayıtlar telefonda görünmez.
+     Cihazlar arası taşıma için Ayarlar > Yedek bölümünü kullanın.
+   - Aynı hesabın (kullaniciadi.github.io) altındaki tüm siteler tarayıcıda aynı depolama alanını paylaşır.
+     Başka sitelerinizi de aynı GitHub hesabında yayınlıyorsanız, bu uygulama için ayrı bir GitHub hesabı
+     (veya kuruluş) ya da kendi alan adınızı kullanın.
+   - Adres değişirse (depo adını değiştirmek gibi) eski adresteki kayıtlar yeni adreste görünmez.
+     Adresi değiştirmeden önce yedek alın.
+   - iPhone'da yedek dosyası indirme çalışmazsa Ayarlar > "Yedek metni oluştur" ile metni kopyalayıp
+     Notlar uygulamasına yapıştırın.
+   - Düzenli yedek alın. Tarayıcı verisini temizlemek tüm kayıtları siler.
