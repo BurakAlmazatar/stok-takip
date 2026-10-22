@@ -217,7 +217,7 @@ label.f>input,label.f>select,label.f>textarea{margin-top:4px;font-weight:400}
 <script>
 /* ---------- Veri ---------- */
 var KEY = 'stokcari_v1';
-var APP_VERSION = '2026.10.23-2';
+var APP_VERSION = '2026.10.23-3';
 function defaults(){ return {products:[],caris:[],docs:[],payments:[],moves:[],counters:{sale:0,purchase:0},seq:1,users:[],campaigns:[],settings:{name:'',phone:'',address:'',taxNo:'',footer:'',logo:'',logoRcpt:false,attrVals:[[],[],[],[],[]]}}; }
 function load(){
   try{ var s = localStorage.getItem(KEY); if(s){ var o = JSON.parse(s); return Object.assign(defaults(), o); } }catch(e){}
@@ -2924,11 +2924,15 @@ async function pollOnce(){
     if(changed || sync.renderPending) maybeRender();
   }catch(e){ if(e.status === 401) srvLogout('Oturum süresi doldu, yeniden giriş yapın'); else setSyncState('err'); }
 }
+/* Giriş ekranında görünsün diye firma adı ve logo (yalnızca bu ikisi) girişsiz alınır */
+async function loadBrand(){
+  try{ var b = await api('GET', '/api/brand'); db.settings.name = b.name || ''; db.settings.logo = b.logo || ''; }catch(e){}
+}
 async function srvLogout(msg){
   try{ if(sync.snap && computeOps().ops.length) await syncNow(); }catch(e){}
   try{ await api('POST', '/api/logout', {}); }catch(e){}
   db = defaults(); sessId = ''; sync.snap = null; clearTimeout(sync.timer);
-  state.ed = {sale:null, purchase:null}; state.cariId = null; state.tab = 'panel'; closeModal(); render();
+  state.ed = {sale:null, purchase:null}; state.cariId = null; state.tab = 'panel'; closeModal(); await loadBrand(); render();
   if(msg) toast(msg, 'err');
 }
 async function bootServer(){
@@ -2942,6 +2946,7 @@ async function bootServer(){
   if(!ping){ ensureUserPerms(); render(); return; }          // sunucu yok: tarayıcı modu (eskisi gibi)
   SRV = true; SRVSETUP = !!ping.setup; sessId = ''; document.body.classList.add('srv');
   if(!SRVSETUP){ try{ var me = await api('GET', '/api/me'); await loadSnapshot(me.user.id); }catch(e){ /* oturum yok: giriş ekranı */ } }
+  if(!cur()) await loadBrand();
   setInterval(pollOnce, 8000);
   document.addEventListener('visibilitychange', function(){ if(!document.hidden) pollOnce(); });
   window.addEventListener('online', function(){ scheduleSync(0); pollOnce(); });
