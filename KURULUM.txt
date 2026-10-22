@@ -39,6 +39,21 @@ Bu klasördeki dosyaların hepsi GitHub'a yüklenecek:
    - Uygulamayı kapatıp açınca (ya da sayfayı yenileyince) yeni sürüm gelir.
      Kayıtlarınız silinmez, çünkü tarayıcıda durur.
 
+5) KAYITLARI BİLGİSAYARDAN TELEFONA TAŞIMA
+   Her cihazın kayıtları ayrı tutulur. Telefonda adresi ilk açtığınızda "İlk kurulum" ekranı
+   görmeniz normaldir: telefonun tarayıcısında henüz hiç kayıt yoktur.
+   a) Bilgisayarda uygulamada: Ayarlar > "Yedek dosyası indir". yedek-tarih.json dosyası iner.
+   b) Dosyayı telefona gönderin: kendinize e-posta (ek olarak), Google Drive/iCloud, WhatsApp "Kendime mesaj"
+      ya da USB. Telefonda dosyayı kaydedin (Dosyalar/İndirilenler).
+   c) Telefonda uygulamayı AÇIN ve "İlk kurulum" ekranında en alttaki "Yedek dosyasından başla" düğmesine basıp
+      yedek dosyasını seçin. Bilgisayardaki kullanıcı adı ve şifrenizle giriş yaparsınız.
+      (Zaten kurulum yaptıysanız: giriş yapın > Ayarlar > "Dosyadan geri yükle".)
+   ÖNEMLİ - iPhone: Ana ekrana eklediğiniz uygulamanın kayıtları Safari'nin kayıtlarından ayrıdır.
+      Önce uygulamayı ana ekrana ekleyin, sonra ana ekrandaki simgeden açıp yedeği ORADA yükleyin.
+      Safari'de yüklediğiniz yedek ana ekran uygulamasında görünmez.
+   - Bu bir senkronizasyon değildir. Taşıdıktan sonra iki cihazda ayrı ayrı çalışırsanız kayıtlar ayrışır.
+     Günlük işi tek cihazda (örneğin telefonda) yapın ya da ortak bulut sürümüne geçin.
+
 ÖNEMLİ NOTLAR
    - Kayıtlar her cihazın kendi tarayıcısında ayrı tutulur. Bilgisayardaki kayıtlar telefonda görünmez.
      Cihazlar arası taşıma için Ayarlar > Yedek bölümünü kullanın.

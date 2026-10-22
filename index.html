@@ -145,6 +145,12 @@ label.f>input,label.f>select,label.f>textarea{margin-top:4px;font-weight:400}
 #toast[hidden]{display:none}
 .legend{font-size:13px;color:var(--muted);margin:-4px 0 12px}
 @media(max-width:640px){.brand small{display:none}.brand{min-width:0}.usr{max-width:46vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}}
+#usr{display:flex;align-items:center;gap:10px}
+.sync{font-size:12px;color:var(--muted);white-space:nowrap}
+.sync i{font-style:normal;color:var(--sale)}
+.sync.busy i,.sync.dirty i{color:var(--warn)}
+.sync.err{color:var(--danger);font-weight:600}.sync.err i{color:var(--danger)}
+@media(max-width:640px){.sync b{display:none}}
 .top .spacer{display:none}
 .cols3{display:grid;gap:0 12px;grid-template-columns:repeat(3,1fr)}
 @media(max-width:480px){.cols3{grid-template-columns:1fr}}
@@ -207,7 +213,7 @@ label.f>input,label.f>select,label.f>textarea{margin-top:4px;font-weight:400}
 <script>
 /* ---------- Veri ---------- */
 var KEY = 'stokcari_v1';
-var APP_VERSION = '2026.10.22-2';
+var APP_VERSION = '2026.10.23-1 (sunucu modu)';
 function defaults(){ return {products:[],caris:[],docs:[],payments:[],moves:[],counters:{sale:0,purchase:0},seq:1,users:[],campaigns:[],settings:{name:'',phone:'',address:'',taxNo:'',footer:'',logo:'',logoRcpt:false,attrVals:[[],[],[],[],[]]}}; }
 function load(){
   try{ var s = localStorage.getItem(KEY); if(s){ var o = JSON.parse(s); return Object.assign(defaults(), o); } }catch(e){}
@@ -215,8 +221,8 @@ function load(){
 }
 var db = load();
 ensureAttrVals();
-function save(){ try{ localStorage.setItem(KEY, JSON.stringify(db)); }catch(e){ toast('Veri kaydedilemedi. Tarayıcı depolama alanı dolu olabilir, yedek alın.', 'err'); } }
-function uid(){ return 'i' + (db.seq++).toString(36) + Date.now().toString(36).slice(-4); }
+function save(){ if(SRV){ scheduleSync(); return; } try{ localStorage.setItem(KEY, JSON.stringify(db)); }catch(e){ toast('Veri kaydedilemedi. Tarayıcı depolama alanı dolu olabilir, yedek alın.', 'err'); } }
+function uid(){ return 'i' + (db.seq++).toString(36) + Date.now().toString(36).slice(-4) + Math.random().toString(36).slice(2, 6); }
 
 /* ---------- Oturum ve yetki ---------- */
 var SESS = 'stokcari_sess';
@@ -422,14 +428,14 @@ function fld(label, inner){ return '<label class="f">' + label + inner + '</labe
 function renderNav(){
   var u = cur();
   $('#nav').innerHTML = u ? TABS.filter(function(t){ return tabOk(t[0]); }).map(function(t){ return '<button class="' + (state.tab === t[0] ? 'on' : '') + '" data-act="go" data-tab="' + t[0] + '">' + menuLabel(t) + '</button>'; }).join('') : '';
-  $('#usr').innerHTML = u ? '<button class="usr" data-act="myAccount">👤 ' + esc(u.name) + '</button>' : '';
+  $('#usr').innerHTML = u ? syncBadge() + '<button class="usr" data-act="myAccount">👤 ' + esc(u.name) + '</button>' : '';
   $('#biz').textContent = (db.settings && db.settings.name) || 'Stok ve Cari Takip';
   $('#logo').innerHTML = logoBlock();
   document.body.classList.toggle('nonav', !u); if(!u) document.body.classList.remove('navopen');
 }
 function render(){
   renderNav();
-  if(!db.users.length){ $('#app').innerHTML = setupView(); return; }
+  if(SRV ? SRVSETUP : !db.users.length){ $('#app').innerHTML = setupView(); return; }
   if(!cur()){ $('#app').innerHTML = loginView(); return; }
   if(!tabOk(state.tab)){
     var ft = TABS.find(function(t){ return tabOk(t[0]); });
@@ -617,8 +623,8 @@ function priceDoc(type, date, rawLines, dd){
 /* ---------- Belge oluşturma ---------- */
 function createDoc(o){
   var T = TYPES[o.type];
-  db.counters[o.type] = (db.counters[o.type] || 0) + 1;
-  var no = T.pre + '-' + String(db.counters[o.type]).padStart(4, '0');
+  var no = o.no;
+  if(!no){ db.counters[o.type] = (db.counters[o.type] || 0) + 1; no = T.pre + '-' + String(db.counters[o.type]).padStart(4, '0'); }
   var pr = priceDoc(o.type, o.date, o.lines, o.docDisc);
   var lines = pr.lines.map(function(l){
     var p = prod(l.pid);
@@ -1256,10 +1262,10 @@ V.settings = function(){
     '</div>' +
     '<button class="btn pri" data-act="saveName">Kaydet</button></div>' + logoCard() + rcCard() + lblCard() + menusCard() : '') +
   (adm ? usersCard() : '') +
-  (adm ? '<div class="card"><h3>Yedekleme</h3><p class="muted" style="margin-top:0">Veriler bu tarayıcıda saklanır. Tarayıcı verisini temizlerseniz silinir; bu yüzden düzenli olarak yedek alın. Yedek kullanıcıları ve şifre özetlerini de içerir, güvenli bir yerde saklayın.</p>' +
-    '<div class="row-end" style="justify-content:flex-start;margin-bottom:10px"><button class="btn" data-act="downloadBackup">Yedek dosyası indir</button><button class="btn" data-act="exportData">Yedek metni oluştur</button><label class="btn" style="cursor:pointer;margin:0">Dosyadan geri yükle<input type="file" id="bkfile" accept=".json,application/json,text/plain" style="display:none"></label><button class="btn" data-act="importData">Kutudaki metinden geri yükle</button></div>' +
-    '<textarea id="bk" rows="5" placeholder="Yedek metni burada görünür. Geri yüklemek için yedeği buraya yapıştırın."></textarea></div>' : '') +
-  '<div class="card"><h3>Görünüm' + (adm ? ' ve veri' : '') + '</h3><div class="row-end" style="justify-content:flex-start"><button class="btn" data-act="theme">' + (dark ? 'Açık tema' : 'Koyu tema') + '</button>' + (adm ? '<button class="btn" data-act="demo">Örnek veri yükle</button><button class="btn danger" data-act="wipe">Tüm verileri sil</button>' : '') + '</div></div>';
+  (adm ? '<div class="card"><h3>Yedekleme</h3><p class="muted" style="margin-top:0">' + (SRV ? 'Veriler sunucudaki SQL Server veritabanında saklanır. Buradan indirilen dosya, ekrandaki verilerin bir kopyasıdır (şifreler dahil değildir). Veritabanı yedeği için sunucudaki yedek betiğini kullanın.' : 'Veriler bu tarayıcıda saklanır. Tarayıcı verisini temizlerseniz silinir; bu yüzden düzenli olarak yedek alın. Yedek kullanıcıları ve şifre özetlerini de içerir, güvenli bir yerde saklayın.') + '</p>' +
+    '<div class="row-end" style="justify-content:flex-start;margin-bottom:10px"><button class="btn" data-act="downloadBackup">Yedek dosyası indir</button><button class="btn" data-act="exportData">Yedek metni oluştur</button>' + (SRV ? '' : '<label class="btn" style="cursor:pointer;margin:0">Dosyadan geri yükle<input type="file" id="bkfile" accept=".json,application/json,text/plain" style="display:none"></label><button class="btn" data-act="importData">Kutudaki metinden geri yükle</button>') + '</div>' +
+    '<textarea id="bk" rows="5" placeholder="Yedek metni burada görünür."' + (SRV ? ' readonly' : '') + '></textarea></div>' : '') +
+  '<div class="card"><h3>Görünüm' + (adm && !SRV ? ' ve veri' : '') + '</h3><div class="row-end" style="justify-content:flex-start"><button class="btn" data-act="theme">' + (dark ? 'Açık tema' : 'Koyu tema') + '</button>' + (adm && !SRV ? '<button class="btn" data-act="demo">Örnek veri yükle</button><button class="btn danger" data-act="wipe">Tüm verileri sil</button>' : '') + '</div></div>';
 };
 
 /* ---------- Olaylar ---------- */
@@ -1279,7 +1285,7 @@ A.rmLine = function(d){ var ed = state.ed[d.type]; ed.lines.splice(+d.i, 1); if(
 A.payAll = function(d){ var ed = state.ed[d.type]; ed.pm = d.m; updateTotals(d.type); };
 A.credit = function(d){ var ed = state.ed[d.type]; ed.pm = null; ed.pay = {n:'', k:'', h:''}; ['n', 'k', 'h'].forEach(function(k){ var i = $('#p_' + k); if(i) i.value = ''; }); updateTotals(d.type); };
 A.quickCari = function(d){ cariForm(null, function(c){ state.ed[d.type].cariId = c.id; render(); }); };
-A.saveDoc = function(d){
+A.saveDoc = async function(d){
   var type = d.type, ed = state.ed[type];
   if(!can(DOC_PERM[type])){ toast('Bu işlem için yetkiniz yok', 'err'); return; }
   if(type === 'sale'){
@@ -1301,7 +1307,9 @@ A.saveDoc = function(d){
     var bad = Object.keys(byp).find(function(pid){ return byp[pid] > remainingQty(ed.ref, pid) + 0.0001; });
     if(bad){ toast('İade miktarı kalan iade edilebilir miktarı aşıyor: ' + ((prod(bad) || {}).name || '') + ' (en fazla ' + qf(remainingQty(ed.ref, bad)) + ')', 'err'); return; }
   }
-  var nd = createDoc({type:type, date:ed.date || today(), cariId:ed.cariId, lines:ed.lines, docDisc:ed.docDisc, pays:pays, note:ed.note, ref:ed.ref});
+  var rno = null;
+  if(SRV){ try{ rno = (await api('POST', '/api/reserve', {type:type})).no; }catch(e){ if(e.status === 401) srvLogout('Oturum süresi doldu, yeniden giriş yapın'); else toast(e.message || 'Belge numarası alınamadı, bağlantıyı kontrol edin', 'err'); return; } }
+  var nd = createDoc({type:type, no:rno, date:ed.date || today(), cariId:ed.cariId, lines:ed.lines, docDisc:ed.docDisc, pays:pays, note:ed.note, ref:ed.ref});
   state.ed[type] = null; commit(); toast(KIND[type] + ' kaydedildi');
   if(type === 'sale' || type === 'sret') A.receipt({kind:'doc', id:nd.id});
 };
@@ -1437,6 +1445,7 @@ document.addEventListener('click', function(e){
   var b = e.target.closest('[data-act]'); if(!b) return;
   var act = b.dataset.act;
   if(!cur() && act !== 'closeModal') return;
+  if(SRV && (act === 'demo' || act === 'wipe' || act === 'importData')){ toast('Sunucu modunda bu işlem kullanılamaz', 'err'); return; }
   var need = ACT_PERM[act];
   if(need && !can(need)){ toast('Bu işlem için yetkiniz yok', 'err'); return; }
   var fn = A[act]; if(fn){ e.preventDefault(); fn(b.dataset, b); }
@@ -1508,7 +1517,7 @@ document.addEventListener('change', function(e){
   if(t.dataset.sf !== undefined){ if(t.dataset.sf === 'st') state.sq.st = t.value; else state.sq.attrs[+t.dataset.sf] = t.value; stRefresh(); return; }
   if(t.dataset.sp){ state.stockPid = t.value; render(); return; }
   if(t.id === 'bkfile' || t.id === 'bkfile2'){
-    var allowed = t.id === 'bkfile2' ? !db.users.length : can('admin');
+    var allowed = !SRV && (t.id === 'bkfile2' ? !db.users.length : can('admin'));
     if(allowed) readBackupFile(t.files && t.files[0], t.id === 'bkfile2');
     t.value = ''; return;
   }
@@ -2585,6 +2594,13 @@ function userForm(id){
         var active = f.active === '1';
         if(u && u.role === 'admin' && u.active !== false && (f.role !== 'admin' || !active) && admins().length <= 1){ toast('Son yönetici pasif yapılamaz veya personele çevrilemez', 'err'); return; }
         var perms = normPerms(Object.keys(f).filter(function(k){ return k.indexOf('perm:') === 0; }).map(function(k){ return k.slice(5); }));
+        if(SRV){
+          try{
+            var ur = await api('POST', '/api/users', {id:u ? u.id : undefined, name:name, username:un, role:f.role, active:active, perms:perms, password:f.pw || undefined});
+            db.users = ur.users; closeModal(); render(); toast('Kullanıcı kaydedildi');
+          }catch(e){ toast(e.message || 'Kaydedilemedi', 'err'); }
+          return;
+        }
         if(u){
           u.name = name; u.username = un; u.role = f.role; u.active = active;
           if(f.role !== 'admin') u.perms = perms;
@@ -2606,7 +2622,10 @@ A.delUser = function(d){
   if(u.role === 'admin' && u.active !== false && admins().length <= 1){ toast('Son yönetici silinemez', 'err'); return; }
   var used = db.docs.some(function(x){ return x.by === u.id; }) || db.payments.some(function(x){ return x.by === u.id; });
   if(used){ toast('Bu kullanıcının işlem kayıtları var. Silmek yerine pasif yapın.', 'err'); return; }
-  confirmBox('Kullanıcı silinecek.', function(){ db.users = db.users.filter(function(x){ return x.id !== u.id; }); commit(); toast('Kullanıcı silindi'); });
+  confirmBox('Kullanıcı silinecek.', function(){
+    if(SRV){ api('DELETE', '/api/users/' + u.id).then(function(r){ db.users = r.users; render(); toast('Kullanıcı silindi'); }).catch(function(e){ toast(e.message || 'Silinemedi', 'err'); }); return; }
+    db.users = db.users.filter(function(x){ return x.id !== u.id; }); commit(); toast('Kullanıcı silindi');
+  });
 };
 A.myAccount = function(){
   var u = cur(); if(!u) return;
@@ -2619,6 +2638,12 @@ A.myAccount = function(){
     function(f){
       if(!f.cp && !f.np && !f.np2) return true;
       (async function(){
+        if(SRV){
+          if(f.np.length < 6){ toast('Yeni şifre en az 6 karakter olmalı', 'err'); return; }
+          if(f.np !== f.np2){ toast('Yeni şifreler aynı değil', 'err'); return; }
+          try{ await api('POST', '/api/password', {current:f.cp, next:f.np}); closeModal(); toast('Şifre değiştirildi'); }catch(e){ toast(e.message || 'Şifre değiştirilemedi', 'err'); }
+          return;
+        }
         if((await hashPw(f.cp, u.salt)) !== u.hash){ toast('Mevcut şifre hatalı', 'err'); return; }
         if(f.np.length < 4){ toast('Yeni şifre en az 4 karakter olmalı', 'err'); return; }
         if(f.np !== f.np2){ toast('Yeni şifreler aynı değil', 'err'); return; }
@@ -2642,7 +2667,7 @@ A.hardRefresh = async function(){
   }catch(e){}
   try{ location.reload(); }catch(e){}
 };
-A.logout = function(){ setSess(''); state.ed = {sale:null, purchase:null}; state.cariId = null; state.tab = 'panel'; closeModal(); render(); };
+A.logout = function(){ if(SRV){ srvLogout(); return; } setSess(''); state.ed = {sale:null, purchase:null}; state.cariId = null; state.tab = 'panel'; closeModal(); render(); };
 
 /* ---------- Giriş ve ilk kurulum ---------- */
 var loginTries = 0, lockUntil = 0;
@@ -2652,12 +2677,12 @@ function loginView(){
     '<div class="err-t" id="lerr"></div><button class="btn pri" style="width:100%">Giriş yap</button></form><div class="muted" style="text-align:center;font-size:12px;margin-top:14px">Sürüm ' + esc(APP_VERSION) + '</div></div>';
 }
 function setupView(){
-  return '<div class="card login">' + logoBlock() + '<h2>İlk kurulum</h2><p class="muted" style="margin-top:4px">Yönetici hesabını oluşturun. Mevcut kayıtlarınız varsa korunur.</p>' +
+  return '<div class="card login">' + logoBlock() + '<h2>İlk kurulum</h2><p class="muted" style="margin-top:4px">' + (SRV ? 'Veritabanı boş. Yönetici hesabını oluşturun.' : 'Yönetici hesabını oluşturun. Mevcut kayıtlarınız varsa korunur.') + '</p>' +
     '<form id="sf">' + fld('İşletme adı', '<input name="biz" placeholder="İsteğe bağlı">') + fld('Ad soyad', '<input name="fn" required>') + fld('Kullanıcı adı', '<input name="u" autocomplete="username" autocapitalize="none" required>') +
     '<div class="cols">' + fld('Şifre', '<input name="p" type="password" autocomplete="new-password" required>') + fld('Şifre (tekrar)', '<input name="p2" type="password" autocomplete="new-password" required>') + '</div>' +
     '<div class="err-t" id="lerr"></div><button class="btn pri" style="width:100%">Kurulumu tamamla</button></form>' +
-    '<div class="muted" style="margin:16px 0 8px;text-align:center">Başka bir cihazdaki kayıtlarınızı taşıyorsanız</div>' +
-    '<label class="btn" style="display:block;text-align:center;cursor:pointer;margin:0">Yedek dosyasından başla<input type="file" id="bkfile2" accept=".json,application/json,text/plain" style="display:none"></label><div class="muted" style="text-align:center;font-size:12px;margin-top:14px">Sürüm ' + esc(APP_VERSION) + '</div></div>';
+    (SRV ? '' : '<div class="muted" style="margin:16px 0 8px;text-align:center">Başka bir cihazdaki kayıtlarınızı taşıyorsanız</div><label class="btn" style="display:block;text-align:center;cursor:pointer;margin:0">Yedek dosyasından başla<input type="file" id="bkfile2" accept=".json,application/json,text/plain" style="display:none"></label>') +
+    '<div class="muted" style="text-align:center;font-size:12px;margin-top:14px">Sürüm ' + esc(APP_VERSION) + '</div></div>';
 }
 document.addEventListener('submit', function(e){
   var f = e.target;
@@ -2668,6 +2693,11 @@ async function doLogin(f){
   var err = $('#lerr'), wait = lockUntil - Date.now();
   if(wait > 0){ err.textContent = 'Çok fazla hatalı deneme. ' + Math.ceil(wait / 1000) + ' saniye sonra tekrar deneyin.'; return; }
   var E = f.elements, un = E.u.value.trim().toLowerCase(), pw = E.p.value;
+  if(SRV){
+    try{ var lr = await api('POST', '/api/login', {username:un, password:pw}); await loadSnapshot(lr.user.id); state.tab = 'panel'; render(); toast('Hoş geldiniz, ' + lr.user.name); }
+    catch(e){ err.textContent = e.message || 'Giriş yapılamadı'; E.p.value = ''; }
+    return;
+  }
   var u = db.users.find(function(x){ return x.username === un && x.active !== false; });
   var ok = false;
   if(u) ok = (await hashPw(pw, u.salt)) === u.hash;
@@ -2681,8 +2711,13 @@ async function doSetup(f){
   var E = f.elements, err = $('#lerr'), nm = E.fn.value.trim(), un = E.u.value.trim().toLowerCase(), pw = E.p.value;
   if(!nm || !un){ err.textContent = 'Ad ve kullanıcı adı girin'; return; }
   if(/\s/.test(un)){ err.textContent = 'Kullanıcı adında boşluk olamaz'; return; }
-  if(pw.length < 4){ err.textContent = 'Şifre en az 4 karakter olmalı'; return; }
+  if(pw.length < (SRV ? 6 : 4)){ err.textContent = 'Şifre en az ' + (SRV ? 6 : 4) + ' karakter olmalı'; return; }
   if(pw !== E.p2.value){ err.textContent = 'Şifreler aynı değil'; return; }
+  if(SRV){
+    try{ var sr = await api('POST', '/api/setup', {name:nm, username:un, password:pw, biz:E.biz.value}); SRVSETUP = false; await loadSnapshot(sr.user.id); state.tab = 'panel'; render(); toast('Kurulum tamamlandı'); }
+    catch(e){ err.textContent = e.message || 'Kurulum yapılamadı'; }
+    return;
+  }
   var salt = newSalt();
   var u = {id:uid(), name:nm, username:un, role:'admin', active:true, salt:salt, hash:await hashPw(pw, salt), created:today()};
   db.users.push(u);
@@ -2690,13 +2725,174 @@ async function doSetup(f){
   setSess(u.id); commit(); toast('Kurulum tamamlandı');
 }
 
+/* ---------- Sunucu modu (SQL Server veritabanı) ---------- */
+var SRV = false, SRVSETUP = false;
+var sync = {since:0, snap:null, busy:false, again:false, timer:null, state:'ok', pending:0, retry:0, renderPending:false};
+var COLLS = ['products', 'caris', 'docs', 'payments', 'moves', 'campaigns'];
+
+function api(method, url, body){
+  return fetch(url, {method:method, headers:body ? {'Content-Type':'application/json'} : {}, body:body ? JSON.stringify(body) : undefined, credentials:'same-origin', cache:'no-store'})
+    .then(function(r){
+      return r.json().catch(function(){ return {}; }).then(function(j){
+        if(!r.ok){ var e = new Error(j.error || ('Sunucu hatası (' + r.status + ')')); e.status = r.status; throw e; }
+        return j;
+      });
+    });
+}
+function syncBadge(){
+  if(!SRV) return '';
+  var m = {ok:['●', 'Eşitlendi'], busy:['↻', 'Kaydediliyor…'], dirty:['●', 'Bekliyor…'], err:['⚠', 'Bağlantı yok' + (sync.pending ? ' · ' + sync.pending + ' değişiklik beklemede' : '')]}[sync.state] || ['●', ''];
+  return '<span id="sync" class="sync ' + sync.state + '" title="' + esc(m[1]) + '"><i>' + m[0] + '</i><b> ' + esc(m[1]) + '</b></span>';
+}
+function setSyncState(st){
+  sync.state = st;
+  var el = $('#sync'); if(el){ var tmp = document.createElement('div'); tmp.innerHTML = syncBadge(); if(tmp.firstChild) el.replaceWith(tmp.firstChild); }
+}
+function snapRows(){
+  var o = {};
+  COLLS.forEach(function(c){ o[c] = {}; (db[c] || []).forEach(function(x){ o[c][x.id] = JSON.stringify(x); }); });
+  o.settings = {}; Object.keys(db.settings || {}).forEach(function(k){ o.settings[k] = JSON.stringify(db.settings[k]); });
+  return o;
+}
+function computeOps(){
+  var cur = snapRows(), snap = sync.snap || {}, ops = [];
+  COLLS.forEach(function(c){
+    var by = {}; (db[c] || []).forEach(function(x){ by[x.id] = x; });
+    Object.keys(cur[c]).forEach(function(id){ if(((snap[c] || {})[id]) !== cur[c][id]) ops.push({t:c, op:'put', row:by[id]}); });
+    Object.keys(snap[c] || {}).forEach(function(id){ if(!(id in cur[c])) ops.push({t:c, op:'del', id:id}); });
+  });
+  Object.keys(cur.settings).forEach(function(k){ if(((snap.settings || {})[k]) !== cur.settings[k]) ops.push({t:'settings', op:'put', key:k, value:db.settings[k]}); });
+  return {ops:ops, cur:cur};
+}
+function chunkOps(ops){                                    // belgeye bağlı stok hareketleri belgeyle aynı istekte gider
+  var mv = {}, rest = [];
+  ops.forEach(function(o){ if(o.t === 'moves' && o.op === 'put' && o.row.ref) (mv[o.row.ref] = mv[o.row.ref] || []).push(o); else rest.push(o); });
+  var out = [], cur = [];
+  rest.forEach(function(o){
+    var grp = [o]; if(o.t === 'docs' && o.op === 'put' && mv[o.row.id]){ grp = grp.concat(mv[o.row.id]); delete mv[o.row.id]; }
+    if(cur.length + grp.length > 1000){ out.push(cur); cur = []; }
+    cur = cur.concat(grp);
+  });
+  Object.keys(mv).forEach(function(k){ cur = cur.concat(mv[k]); });
+  if(cur.length) out.push(cur);
+  return out;
+}
+function markSynced(o, cur){
+  if(o.t === 'settings'){ sync.snap.settings[o.key] = cur.settings[o.key]; return; }
+  var m = sync.snap[o.t];
+  if(o.op === 'put') m[o.row.id] = cur[o.t][o.row.id]; else delete m[o.id];
+}
+function scheduleSync(ms){ if(!SRV || !sync.snap) return; clearTimeout(sync.timer); setSyncState('dirty'); sync.timer = setTimeout(syncNow, ms == null ? 300 : ms); }
+async function syncNow(){
+  if(!SRV || !sync.snap) return;
+  if(sync.busy){ sync.again = true; return; }
+  sync.busy = true; setSyncState('busy');
+  try{
+    var r = computeOps(), chunks = chunkOps(r.ops);
+    for(var i = 0; i < chunks.length; i++){
+      var res = await api('POST', '/api/changes', {ops:chunks[i]});
+      chunks[i].forEach(function(o){ markSynced(o, r.cur); });
+      if(res.prev === sync.since) sync.since = res.ver;
+    }
+    sync.pending = 0; sync.retry = 0; setSyncState('ok');
+  }catch(e){ await syncFailed(e); }
+  sync.busy = false;
+  if(sync.again){ sync.again = false; scheduleSync(0); }
+  else if(sync.renderPending) maybeRender();
+}
+async function syncFailed(e){
+  if(e.status === 401){ srvLogout('Oturum süresi doldu, yeniden giriş yapın'); return; }
+  if(e.status >= 400 && e.status < 500){                    // sunucu reddetti: yerel değişiklikleri geri al, sunucudaki hâle dön
+    toast((e.message || 'İşlem reddedildi') + ' Değişiklik geri alındı.', 'err');
+    try{ await loadSnapshot(sessId); render(); setSyncState('ok'); }catch(x){ setSyncState('err'); }
+    return;
+  }
+  sync.pending = computeOps().ops.length; setSyncState('err');
+  sync.retry = Math.min(30000, (sync.retry || 2000) * 2); clearTimeout(sync.timer); sync.timer = setTimeout(syncNow, sync.retry);
+}
+async function loadSnapshot(userId){
+  var r = await api('GET', '/api/sync?since=0');
+  var d = r.data, base = defaults();
+  db = Object.assign(base, {products:d.products, caris:d.caris, docs:d.docs, payments:d.payments, moves:d.moves, campaigns:d.campaigns, settings:d.settings || {}, users:r.users});
+  if(userId) sessId = userId;
+  ensureAttrVals();                                          // yerel düzenleme; sunucuya fark olarak gönderilmez
+  sync.snap = snapRows(); sync.since = r.ver; sync.pending = 0; sync.retry = 0; setSyncState('ok');
+}
+function canon(v){
+  if(Array.isArray(v)) return v.map(canon);
+  if(v && typeof v === 'object'){ var o = {}; Object.keys(v).sort().forEach(function(k){ var x = canon(v[k]); if(x !== '' && x !== null && x !== undefined) o[k] = x; }); return o; }
+  return v;
+}
+function applyRemote(r){
+  var changed = false;
+  COLLS.forEach(function(c){
+    var arr = db[c], idx = {}; arr.forEach(function(o, i){ idx[o.id] = i; });
+    (r.data[c] || []).forEach(function(o){
+      var i = idx[o.id], cur = i === undefined ? null : arr[i];
+      if(cur && JSON.stringify(cur) !== sync.snap[c][o.id]) return;                     // yerelde bekleyen değişiklik var
+      if(cur && JSON.stringify(canon(cur)) === JSON.stringify(canon(o))){ sync.snap[c][o.id] = JSON.stringify(cur); return; }
+      if(i === undefined) arr.push(o); else arr[i] = o;
+      sync.snap[c][o.id] = JSON.stringify(o); changed = true;
+    });
+    (r.deleted[c] || []).forEach(function(id){
+      var i = db[c].findIndex(function(x){ return x.id === id; });
+      if(i >= 0){ if(JSON.stringify(db[c][i]) !== sync.snap[c][id]) return; db[c].splice(i, 1); changed = true; }
+      delete sync.snap[c][id];
+    });
+  });
+  Object.keys(r.data.settings || {}).forEach(function(k){
+    if(db.settings[k] !== undefined && JSON.stringify(db.settings[k]) !== sync.snap.settings[k]) return;
+    if(JSON.stringify(canon(db.settings[k])) === JSON.stringify(canon(r.data.settings[k]))){ sync.snap.settings[k] = JSON.stringify(db.settings[k]); return; }
+    db.settings[k] = r.data.settings[k]; sync.snap.settings[k] = JSON.stringify(db.settings[k]); changed = true;
+  });
+  if(JSON.stringify(r.users) !== JSON.stringify(db.users)){ db.users = r.users; changed = true; }
+  return changed;
+}
+function uiBusy(){
+  var ae = document.activeElement;
+  return !$('#modal').hidden || !!(state.ed.sale || state.ed.purchase || state.ed.sret || state.ed.pret) || !!(ae && /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName) && $('#app').contains(ae));
+}
+function maybeRender(){ if(uiBusy()){ sync.renderPending = true; return; } sync.renderPending = false; render(); }
+async function pollOnce(){
+  if(!SRV || !sync.snap || sync.busy || document.hidden) return;
+  try{
+    var r = await api('GET', '/api/sync?since=' + sync.since);
+    var changed = applyRemote(r); sync.since = r.ver;
+    if(sync.state === 'err') setSyncState('ok');
+    if(changed || sync.renderPending) maybeRender();
+  }catch(e){ if(e.status === 401) srvLogout('Oturum süresi doldu, yeniden giriş yapın'); else setSyncState('err'); }
+}
+async function srvLogout(msg){
+  try{ if(sync.snap && computeOps().ops.length) await syncNow(); }catch(e){}
+  try{ await api('POST', '/api/logout', {}); }catch(e){}
+  db = defaults(); sessId = ''; sync.snap = null; clearTimeout(sync.timer);
+  state.ed = {sale:null, purchase:null}; state.cariId = null; state.tab = 'panel'; closeModal(); render();
+  if(msg) toast(msg, 'err');
+}
+async function bootServer(){
+  $('#app').innerHTML = '<div class="empty">Yükleniyor…</div>';
+  var ping = null;
+  try{
+    var ctl = new AbortController(), tm = setTimeout(function(){ ctl.abort(); }, 3000);
+    var r = await fetch('/api/ping', {signal:ctl.signal, cache:'no-store'}); clearTimeout(tm);
+    if(r.ok){ var j = await r.json(); if(j && j.app === 'stokcari') ping = j; }
+  }catch(e){ ping = null; }
+  if(!ping){ ensureUserPerms(); render(); return; }          // sunucu yok: tarayıcı modu (eskisi gibi)
+  SRV = true; SRVSETUP = !!ping.setup; sessId = ''; document.body.classList.add('srv');
+  if(!SRVSETUP){ try{ var me = await api('GET', '/api/me'); await loadSnapshot(me.user.id); }catch(e){ /* oturum yok: giriş ekranı */ } }
+  setInterval(pollOnce, 8000);
+  document.addEventListener('visibilitychange', function(){ if(!document.hidden) pollOnce(); });
+  window.addEventListener('online', function(){ scheduleSync(0); pollOnce(); });
+  window.addEventListener('beforeunload', function(e){ if(SRV && sync.snap && (sync.busy || computeOps().ops.length)){ e.preventDefault(); e.returnValue = ''; } });
+  render();
+}
+
 /* ---------- Uygulama gibi kurulum (PWA) ---------- */
 try{ if(navigator.storage && navigator.storage.persist) navigator.storage.persist(); }catch(e){}
 if('serviceWorker' in navigator && /^https?:$/.test(location.protocol)){
   window.addEventListener('load', function(){ navigator.serviceWorker.register('sw.js').catch(function(){}); });
 }
-ensureUserPerms();
-render();
+if(typeof fetch === 'function' && /^https?:$/.test(location.protocol)){ bootServer(); } else { ensureUserPerms(); render(); }
 </script>
 </body>
 </html>
