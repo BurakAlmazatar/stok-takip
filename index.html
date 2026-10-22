@@ -45,16 +45,29 @@ html{scroll-padding-top:calc(env(safe-area-inset-top,0px) + 64px)}
 body{margin:0;background:var(--bg);color:var(--text);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;font-variant-numeric:tabular-nums}
 body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);background:var(--surface);z-index:30}
 header{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--surface);border-bottom:1px solid var(--border)}
-.top{display:flex;align-items:center;gap:12px;padding:10px 16px 0;max-width:1100px;margin:0 auto}
+.top{display:flex;align-items:center;gap:12px;padding:10px 16px;max-width:1400px;margin:0 auto}
 .brand{font-weight:700;font-size:17px;letter-spacing:-.01em}
 .brand small{display:block;font-weight:500;font-size:12px;color:var(--muted);letter-spacing:0}
 .spacer{flex:1}
-nav{display:flex;gap:2px;overflow-x:auto;padding:6px 12px 0;max-width:1100px;margin:0 auto;scrollbar-width:none}
-nav::-webkit-scrollbar{display:none}
-nav button{flex:none;border:0;background:none;color:var(--muted);font:inherit;font-weight:600;padding:9px 12px;border-bottom:3px solid transparent;cursor:pointer;white-space:nowrap}
-nav button:hover{color:var(--text)}
-nav button.on{color:var(--accent);border-bottom-color:var(--accent)}
-main{max-width:1100px;margin:0 auto;padding:16px 16px 80px}
+.shell{display:flex;align-items:flex-start;max-width:1400px;margin:0 auto}
+nav#nav{flex:none;width:220px;position:sticky;top:calc(env(safe-area-inset-top,0px) + 58px);max-height:calc(100vh - 58px - env(safe-area-inset-top,0px));overflow-y:auto;padding:12px 10px;display:flex;flex-direction:column;gap:2px}
+nav#nav button{border:0;background:none;color:var(--muted);font:inherit;font-weight:600;text-align:left;padding:10px 14px;border-radius:8px;cursor:pointer;width:100%}
+nav#nav button:hover{background:var(--surface-2);color:var(--text)}
+nav#nav button.on{background:var(--accent-soft);color:var(--accent)}
+main{flex:1;min-width:0;max-width:1100px;padding:16px 16px 80px}
+.menubtn{display:none;border:1px solid var(--border);background:var(--surface-2);color:var(--text);border-radius:8px;width:40px;height:40px;font-size:20px;line-height:1;cursor:pointer;flex:none}
+#navbk{display:none}
+body.nonav nav#nav{display:none}
+@media(max-width:899px){
+  .menubtn{display:inline-flex;align-items:center;justify-content:center}
+  body.nonav .menubtn{display:none}
+  .shell{display:block}
+  nav#nav{position:fixed;left:0;top:0;bottom:0;max-height:none;width:min(82vw,300px);z-index:45;background:var(--surface);border-right:1px solid var(--border);padding:calc(env(safe-area-inset-top,0px) + 14px) 10px calc(env(safe-area-inset-bottom,0px) + 14px);transform:translateX(-104%);transition:transform .2s ease;box-shadow:0 0 24px rgba(0,0,0,.25)}
+  body.navopen nav#nav{transform:none}
+  body.navopen #navbk{display:block;position:fixed;inset:0;background:rgba(10,15,25,.5);z-index:40}
+  nav#nav button{padding:14px 14px;font-size:16px}
+  main{padding:12px 12px 80px}
+}
 h2{font-size:20px;margin:0;letter-spacing:-.01em}
 h3{font-size:15px;margin:0 0 10px}
 .bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px}
@@ -131,6 +144,7 @@ label.f>input,label.f>select,label.f>textarea{margin-top:4px;font-weight:400}
 #toast.err{background:var(--danger);color:#fff}
 #toast[hidden]{display:none}
 .legend{font-size:13px;color:var(--muted);margin:-4px 0 12px}
+@media(max-width:640px){.brand small{display:none}.brand{min-width:0}.usr{max-width:46vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}}
 .top .spacer{display:none}
 .cols3{display:grid;gap:0 12px;grid-template-columns:repeat(3,1fr)}
 @media(max-width:480px){.cols3{grid-template-columns:1fr}}
@@ -169,10 +183,10 @@ label.f>input,label.f>select,label.f>textarea{margin-top:4px;font-weight:400}
 @page{size:80mm auto;margin:3mm}
 @media print{
   body{background:#fff}
-  body::before,header,main,#toast{display:none!important}
+  body::before,header,nav,#navbk,main,#toast{display:none!important}
   #modal{position:static;background:none;display:block;padding:0}
   .sheet{max-width:none;max-height:none;overflow:visible;padding:0;background:none;border-radius:0}
-  .sheet h3,.row-end{display:none!important}
+  .sheet h3,.row-end,.noprint{display:none!important}
   .rcpt{border:0;width:100%;padding:0;margin:0}
 }
 </style>
@@ -180,19 +194,20 @@ label.f>input,label.f>select,label.f>textarea{margin-top:4px;font-weight:400}
 <body>
 <header>
   <div class="top">
+    <button id="menubtn" class="menubtn" data-act="toggleNav" aria-label="Menüyü aç veya kapat">☰</button>
     <span id="logo"></span><div class="brand"><span id="biz">Stok ve Cari Takip</span><small>Satış, alış, stok ve cari hesaplar</small></div><span id="usr"></span>
     <span class="spacer"></span>
   </div>
-  <nav id="nav"></nav>
 </header>
-<main id="app"></main>
+<div class="shell"><nav id="nav" aria-label="Menü"></nav><main id="app"></main></div>
+<div id="navbk" data-act="toggleNav"></div>
 <div class="modal" id="modal" hidden></div>
 <div id="toast" hidden></div>
 
 <script>
 /* ---------- Veri ---------- */
 var KEY = 'stokcari_v1';
-var APP_VERSION = '2026.10.21-2 (dosyadan geri yükleme)';
+var APP_VERSION = '2026.10.22-2 (etiket tasarımı)';
 function defaults(){ return {products:[],caris:[],docs:[],payments:[],moves:[],counters:{sale:0,purchase:0},seq:1,users:[],campaigns:[],settings:{name:'',phone:'',address:'',taxNo:'',footer:'',logo:'',logoRcpt:false,attrVals:[[],[],[],[],[]]}}; }
 function load(){
   try{ var s = localStorage.getItem(KEY); if(s){ var o = JSON.parse(s); return Object.assign(defaults(), o); } }catch(e){}
@@ -270,7 +285,7 @@ var ACT_PERM = {
   repPreset:'reports.view', repType:'reports.view', copyRep:'reports.view', repMethod:'payrep.view', copyPay:'payrep.view',
   newCamp:'campaigns.edit', editCamp:'campaigns.edit', togCamp:'campaigns.edit', delCamp:'campaigns.edit',
   saveAttrs:'attrs.edit', addVal:'attrs.edit', editVal:'attrs.edit', delVal:'attrs.edit',
-  saveName:'settings.edit', rmLogo:'settings.edit',
+  saveName:'settings.edit', rmLogo:'settings.edit', saveRc:'settings.edit', saveLbl:'settings.edit', lblReset:'settings.edit', lblTest:'settings.edit', rcReset:'settings.edit', saveMenus:'settings.edit', menusReset:'settings.edit',
   exportData:'admin', importData:'admin', downloadBackup:'admin', demo:'admin', wipe:'admin', newUser:'admin', editUser:'admin', delUser:'admin', permTpl:'admin'
 };
 function userName(id){ var u = db.users.find(function(x){ return x.id === id; }); return u ? u.name : '—'; }
@@ -335,12 +350,12 @@ function moneyMoves(from, to, user){
     if(!ok(d.date) || (user && d.by !== user)) return;
     var p = docPays(d);
     Object.keys(p).forEach(function(m){
-      if(p[m] > 0) out.push({date:d.date, ts:d.ts, kind:d.type, dir:TYPES[d.type].cashIn ? 'in' : 'out', method:m, amt:p[m], src:KIND[d.type] + ' ' + d.no, who:d.cariId, by:d.by});
+      if(p[m] > 0) out.push({date:d.date, ts:d.ts, kind:d.type, dir:TYPES[d.type].cashIn ? 'in' : 'out', method:m, amt:p[m], src:KIND[d.type] + ' ' + d.no, who:d.cariId, whoName:cariName(d.cariId), by:d.by});
     });
   });
   db.payments.forEach(function(p){
     if(!ok(p.date) || (user && p.by !== user)) return;
-    out.push({date:p.date, ts:p.ts, kind:p.dir, dir:p.dir, method:p.method, amt:p.amount, src:p.dir === 'in' ? 'Tahsilat' : 'Ödeme', who:p.cariId, by:p.by});
+    out.push({date:p.date, ts:p.ts, kind:p.dir, dir:p.dir, method:p.method, amt:p.amount, src:p.dir === 'in' ? 'Tahsilat' : 'Ödeme', who:p.cariId, whoName:payWho(p.cariId), by:p.by});
   });
   return out;
 }
@@ -375,7 +390,7 @@ function cash(from, to, user){
 function critical(){ return db.products.filter(function(p){ return p.min > 0 && stockOf(p.id) <= p.min; }); }
 
 /* ---------- Arayüz iskeleti ---------- */
-var state = {tab:'panel', ed:{sale:null, purchase:null}, q:{products:'', caris:''}, cariId:null, stockPid:'', sq:{q:'', attrs:['', '', '', '', ''], st:''}, rep:{from:'', to:'', type:'all', user:'', method:''}};
+var state = {tab:'panel', ed:{sale:null, purchase:null}, q:{products:'', caris:'', campaigns:''}, cariId:null, stockPid:'', dq:newDq(), sq:{q:'', attrs:['', '', '', '', ''], st:''}, rep:{from:'', to:'', type:'all', user:'', method:''}};
 (function(){ var n = new Date(); state.rep.from = ymd(new Date(n.getFullYear(), n.getMonth(), 1)); state.rep.to = today(); })();
 var TABS = [['panel','Panel'],['sales','Satış'],['purchases','Alış'],['products','Ürünler'],['attrs','Özellikler'],['campaigns','Kampanyalar'],['stock','Stok'],['caris','Cariler'],['payments','Tahsilat / Ödeme'],['reports','Raporlar'],['payrep','Ödeme Raporu'],['settings','Ayarlar']];
 
@@ -406,10 +421,11 @@ function fld(label, inner){ return '<label class="f">' + label + inner + '</labe
 
 function renderNav(){
   var u = cur();
-  $('#nav').innerHTML = u ? TABS.filter(function(t){ return tabOk(t[0]); }).map(function(t){ return '<button class="' + (state.tab === t[0] ? 'on' : '') + '" data-act="go" data-tab="' + t[0] + '">' + t[1] + '</button>'; }).join('') : '';
+  $('#nav').innerHTML = u ? TABS.filter(function(t){ return tabOk(t[0]); }).map(function(t){ return '<button class="' + (state.tab === t[0] ? 'on' : '') + '" data-act="go" data-tab="' + t[0] + '">' + menuLabel(t) + '</button>'; }).join('') : '';
   $('#usr').innerHTML = u ? '<button class="usr" data-act="myAccount">👤 ' + esc(u.name) + '</button>' : '';
   $('#biz').textContent = (db.settings && db.settings.name) || 'Stok ve Cari Takip';
   $('#logo').innerHTML = logoBlock();
+  document.body.classList.toggle('nonav', !u); if(!u) document.body.classList.remove('navopen');
 }
 function render(){
   renderNav();
@@ -421,6 +437,7 @@ function render(){
     state.tab = ft[0];
   }
   $('#app').innerHTML = V[state.tab]();
+  if(state.tab === 'settings') lbWarn();
 }
 
 /* ---------- Belge oluşturma ---------- */
@@ -432,7 +449,7 @@ function nextEan(){
   var body = '29' + String(max + 1).padStart(10, '0');
   return body + ean13Check(body);
 }
-function ean13Svg(code){
+function ean13Svg(code, o){
   if(!/^\d{13}$/.test(code) || ean13Check(code.slice(0, 12)) !== +code[12]) return '';
   var L = ['0001101','0011001','0010011','0111101','0100011','0110001','0101111','0111011','0110111','0001011'];
   var G = ['0100111','0110011','0011011','0100001','0011101','0111001','0000101','0010001','0001001','0010111'];
@@ -443,14 +460,14 @@ function ean13Svg(code){
   bits += '01010';
   for(i = 7; i <= 12; i++) bits += R[+code[i]];
   bits += '101';
-  var q = 9, h = 56, rects = '', run = -1;
+  var q = 9, rects = '', run = -1, mod = (o && o.wmm) ? o.wmm / (95 + 2 * q) : 0, h = (o && o.hmm && mod) ? o.hmm / mod : 56, dg = !o || o.digits !== false;
   for(i = 0; i <= bits.length; i++){
     var on = i < bits.length && bits[i] === '1';
     if(on && run < 0) run = i;
     if(!on && run >= 0){ rects += '<rect x="' + (q + run) + '" y="0" width="' + (i - run) + '" height="' + h + '"/>'; run = -1; }
   }
-  return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + (95 + 2 * q) + ' ' + (h + 12) + '" style="width:100%;max-width:240px;height:auto;background:#fff" role="img" aria-label="Barkod ' + code + '"><g fill="#000">' + rects + '</g>' +
-    '<g font-family="monospace" font-size="9" fill="#000"><text x="1" y="' + (h + 10) + '">' + code[0] + '</text><text x="' + (q + 3) + '" y="' + (h + 10) + '" textLength="42" lengthAdjust="spacing">' + code.slice(1, 7) + '</text><text x="' + (q + 50) + '" y="' + (h + 10) + '" textLength="42" lengthAdjust="spacing">' + code.slice(7) + '</text></g></svg>';
+  return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + (95 + 2 * q) + ' ' + (h + (dg ? 12 : 0)) + '" style="' + (mod ? 'width:' + o.wmm + 'mm;height:' + (Math.round((h + (dg ? 12 : 0)) * mod * 100) / 100) + 'mm;' : 'width:100%;max-width:240px;height:auto;') + 'background:#fff" role="img" aria-label="Barkod ' + code + '"><g fill="#000">' + rects + '</g>' +
+    (dg ? '<g font-family="monospace" font-size="9" fill="#000"><text x="1" y="' + (h + 10) + '">' + code[0] + '</text><text x="' + (q + 3) + '" y="' + (h + 10) + '" textLength="42" lengthAdjust="spacing">' + code.slice(1, 7) + '</text><text x="' + (q + 50) + '" y="' + (h + 10) + '" textLength="42" lengthAdjust="spacing">' + code.slice(7) + '</text></g>' : '') + '</svg>';
 }
 
 /* ---------- Ürün özellikleri ---------- */
@@ -613,7 +630,12 @@ function createDoc(o){
   if(o.pays){ Object.keys(o.pays).forEach(function(m){ var v = r2(num(o.pays[m])); if(v > 0) pays[m] = v; }); }
   else if(num(o.paid) > 0){ pays['Nakit'] = r2(num(o.paid)); }
   var paid = r2(sum(Object.keys(pays), function(m){ return pays[m]; }));
-  var doc = {id:uid(), no:no, type:o.type, date:o.date, cariId:o.cariId || '', lines:lines, total:total, gross:pr.gross, docDisc:pr.docDisc, paid:paid, pays:pays, note:o.note || '', by:(cur() || {}).id || '', ts:Date.now() + db.seq};
+  var od = o.ref ? origDoc(o.ref) : null;
+  if(od) lines.forEach(function(l){
+    var ol = od.lines.find(function(x){ return x.pid === l.pid; });
+    if(ol){ if(ol.vat != null) l.vat = ol.vat; if(T.sellSide && ol.cost != null) l.cost = ol.cost; }
+  });
+  var doc = {id:uid(), no:no, type:o.type, date:o.date, cariId:o.cariId || '', lines:lines, total:total, gross:pr.gross, docDisc:pr.docDisc, paid:paid, pays:pays, note:o.note || '', ref:od ? od.id : '', refNo:od ? od.no : '', by:(cur() || {}).id || '', ts:Date.now() + db.seq};
   db.docs.push(doc);
   lines.forEach(function(l){
     db.moves.push({id:uid(), pid:l.pid, qty:T.stock * l.qty, date:o.date, reason:KIND[o.type], ref:doc.id, no:no, ts:doc.ts});
@@ -630,7 +652,7 @@ function docRows(docs){
   return '<div class="tbl"><table><thead><tr><th>Tarih</th><th>Tür</th><th>No</th><th>Cari</th><th class="r">Tutar</th><th class="r">Ödenen</th><th class="r">Kalan</th></tr></thead><tbody>' +
     docs.map(function(d){
       var rest = r2(d.total - d.paid);
-      return '<tr data-act="openDoc" data-id="' + d.id + '"><td class="nw">' + fd(d.date) + '</td><td>' + tag(d.type) + '</td><td class="nw">' + esc(d.no) + '</td><td>' + esc(cariName(d.cariId)) + '</td><td class="r">' + money(d.total) + '</td><td class="r">' + money(d.paid) + '</td><td class="r">' + (rest > 0.004 ? '<span class="neg">' + money(rest) + '</span>' : '<span class="muted">—</span>') + '</td></tr>';
+      return '<tr data-act="openDoc" data-id="' + d.id + '"><td class="nw">' + fd(d.date) + '</td><td>' + tag(d.type) + '</td><td class="nw">' + esc(d.no) + (d.refNo ? '<div class="muted" style="font-size:12px">↩ ' + esc(d.refNo) + '</div>' : '') + '</td><td>' + esc(cariName(d.cariId)) + '</td><td class="r">' + money(d.total) + '</td><td class="r">' + money(d.paid) + '</td><td class="r">' + (rest > 0.004 ? '<span class="neg">' + money(rest) + '</span>' : '<span class="muted">—</span>') + '</td></tr>';
     }).join('') + '</tbody></table></div>';
 }
 function sortedDocs(types){
@@ -667,7 +689,7 @@ V.panel = function(){
   var left = '' +
     (cS ? '<div class="card"><h3>Son 14 günün satışları</h3><div class="bars">' + days.map(function(x){ return '<div title="' + fd(x.k) + ': ' + money(x.v) + '"><i style="height:' + Math.round(x.v / mx * 100) + '%"></i>' + x.lab + '</div>'; }).join('') + '</div></div>' : '') +
     (anyAct ? '<div class="card"><h3>Son işlemler</h3>' + (acts.length ? '<div class="tbl"><table><tbody>' + acts.map(function(a){
-      return '<tr' + (a.doc ? ' data-act="openDoc" data-id="' + a.id + '"' : '') + '><td class="nw">' + fd(a.date) + '</td><td>' + tag(a.kind) + '</td><td>' + esc(cariName(a.who)) + '</td><td class="r">' + money(a.amt) + '</td></tr>';
+      return '<tr' + (a.doc ? ' data-act="openDoc" data-id="' + a.id + '"' : '') + '><td class="nw">' + fd(a.date) + '</td><td>' + tag(a.kind) + '</td><td>' + esc(a.doc ? cariName(a.who) : payWho(a.who)) + '</td><td class="r">' + money(a.amt) + '</td></tr>';
     }).join('') + '</tbody></table></div>' : '<div class="empty">İşlem yok. Önce ürün ve cari ekleyin, sonra satış ya da alış girin.</div>') + '</div>' : '');
   var right = '' +
     (cSt ? '<div class="card"><h3>Kritik stok</h3>' + (crit.length ? '<div class="tbl"><table><tbody>' + crit.map(function(p){ var s0 = stockOf(p.id); return '<tr><td>' + esc(p.name) + '</td><td class="r"><span class="tag ' + (s0 <= 0 ? 'bad' : 'warn') + '">' + qf(s0) + ' ' + esc(p.unit) + '</span></td></tr>'; }).join('') + '</tbody></table></div>' : '<div class="muted">Uyarı gerektiren ürün yok.</div>') + '</div>' : '') +
@@ -698,11 +720,32 @@ function dsumText(pr){
   return a.join(' · ');
 }
 var PKEY = {n:'Nakit', k:'Kredi kartı', h:'Havale / EFT'};
+function syncPay(ed, t){
+  if(ed.pm === 'ref'){
+    /* bağlı iade: belgede gerçekten ödenen tutarın, iade edilen paya düşen kısmı, belgedeki ödeme yöntemleriyle */
+    var o = ed.ref ? origDoc(ed.ref) : null, km = {'Nakit':'n', 'Kredi kartı':'k', 'Havale / EFT':'h'};
+    ed.pay = {n:'', k:'', h:''};
+    if(o && o.total > 0 && t > 0){
+      var ratio = Math.min(1, t / o.total), left = r2(t), op = docPays(o);
+      Object.keys(op).forEach(function(m){
+        var k = km[m] || 'n', v = Math.min(left, r2(op[m] * ratio));
+        if(v > 0){ ed.pay[k] = String(r2(num(ed.pay[k]) + v)); left = r2(left - v); }
+      });
+    }
+    return;
+  }
+  if(ed.pm){ ['n', 'k', 'h'].forEach(function(k){ ed.pay[k] = (k === ed.pm && t) ? t : ''; }); }
+}
 function edPaid(ed){ return r2(num(ed.pay.n) + num(ed.pay.k) + num(ed.pay.h)); }
 function lineInfo(type, ed, i){
   var l = ed.lines[i], p = prod(l.pid);
   if(!p) return '';
   var st = stockOf(p.id);
+  if(ed.ref && (type === 'sret' || type === 'pret')){
+    var rem = remainingQty(ed.ref, l.pid), need0 = sum(ed.lines.filter(function(x){ return x.pid === l.pid; }), function(x){ return num(x.qty); });
+    if(need0 > rem + 0.0001) return '<span class="neg">İade edilebilir en fazla ' + qf(rem) + ' ' + esc(p.unit) + '</span>';
+    return '<span class="muted">İade edilebilir: ' + qf(rem) + ' ' + esc(p.unit) + ' (bağlı belgeden)</span>';
+  }
   if(TYPES[type].stock < 0){
     var need = sum(ed.lines.filter(function(x){ return x.pid === l.pid; }), function(x){ return num(x.qty); });
     if(need > st) return '<span class="neg">Stok: ' + qf(st) + ' ' + esc(p.unit) + ' (yetersiz)</span>';
@@ -723,9 +766,15 @@ function discSel(attrs, d){
 function editorHTML(type, ed){
   var T = TYPES[type], ret = type === 'sret' || type === 'pret';
   var cs = db.caris.slice().sort(function(a, b){ return a.name.localeCompare(b.name, 'tr'); });
-  var pr = edPricing(type, ed), tot = pr.total, paid = edPaid(ed);
+  var pr = edPricing(type, ed), tot = pr.total; syncPay(ed, tot); var paid = edPaid(ed);
   var pls = priceLines(type, ed.date || today(), ed.lines);
   var discOk = type !== 'sale' || can('sales.discount'), priceOk = type !== 'sale' || can('sales.price');
+  var refUI = '';
+  if(ret){
+    var rd = ed.ref ? origDoc(ed.ref) : null;
+    if(rd) refUI = '<div class="hint">Bağlı belge: <b>' + esc(rd.no) + '</b> · ' + fd(rd.date) + ' · ' + esc(cariName(rd.cariId)) + ' · ' + money(rd.total) + ' <button type="button" class="btn sm" data-act="refClear" data-type="' + type + '">Bağlantıyı kaldır</button><div class="muted" style="margin-top:4px">Yalnızca bu belgedeki ürünler, kalan iade edilebilir miktar kadar iade edilebilir. Fiyatlar belgedeki ödenen birim fiyattır. İade tutarı, belgede ödenen tutarın iade edilen paya düşen kısmı kadar belgedeki ödeme yöntemleriyle otomatik doldurulur, değiştirebilirsiniz.</div></div>';
+    else refUI = '<div class="card" style="padding:12px">' + fld('Bağlı ' + (type === 'sret' ? 'satış' : 'alış') + ' (isteğe bağlı)', '<input list="refdl" data-ed="' + type + '" data-f="refq" placeholder="Belge no yazın veya listeden seçin" autocomplete="off"><datalist id="refdl">' + refOptions(type) + '</datalist>') + '<div class="muted" style="margin-top:-4px;font-size:12px">Seçerseniz ürünler, fiyatlar ve cari belgeden gelir, iade edilebilir miktar kontrol edilir. Boş bırakırsanız bağlantısız iade olur.</div></div>';
+  }
   var dd = ed.docDisc || {t:'%', v:''};
   var hint = type === 'sret' ? 'Müşteriden geri alınan ürünler stoğa girer ve carinin bakiyesinden düşer. Müşteriye para iade ettiyseniz aşağıya yazın, iade etmediyseniz “Para iadesi yok” deyin.'
     : type === 'pret' ? 'Tedarikçiye geri gönderilen ürünler stoktan düşer ve borcunuzdan düşülür. Tedarikçi para iade ettiyse aşağıya yazın, etmediyse “Para iadesi yok” deyin.' : '';
@@ -733,7 +782,7 @@ function editorHTML(type, ed){
   var canRet = can(DOC_PERM[base]) && can(DOC_PERM[retT]);
   var sw = canRet ? '<div class="chips">' + [base, retT].map(function(k){ return '<button type="button" class="chip' + (k === type ? ' on' : '') + '" data-act="switchDoc" data-from="' + type + '" data-to="' + k + '">' + KIND[k] + '</button>'; }).join('') + '</div>' : '';
   var payIn = function(k, label){ return fld(label, '<input type="number" inputmode="decimal" step="any" min="0" id="p_' + k + '" value="' + esc(ed.pay[k]) + '" data-ed="' + type + '" data-f="pay_' + k + '">'); };
-  return '<div class="bar"><h2>' + ED_TITLE[type] + '</h2><span class="spacer"></span>' + sw + '</div>' + (hint ? '<div class="hint">' + hint + '</div>' : '') +
+  return '<div class="bar"><h2>' + ED_TITLE[type] + '</h2><span class="spacer"></span>' + sw + '</div>' + (hint ? '<div class="hint">' + hint + '</div>' : '') + refUI +
   '<div class="card">' +
     '<div class="cols">' +
       fld('Cari', '<div style="display:flex;gap:6px"><select data-ed="' + type + '" data-f="cariId"><option value="">' + (T.sellSide ? 'Perakende (cari yok)' : 'Cari seçin') + '</option>' + cs.map(function(c){ return '<option value="' + c.id + '"' + (ed.cariId === c.id ? ' selected' : '') + '>' + esc(c.name) + '</option>'; }).join('') + '</select>' + (can('addCari') ? '<button type="button" class="btn" data-act="quickCari" data-type="' + type + '" title="Yeni cari">+</button>' : '') + '</div>') +
@@ -745,7 +794,7 @@ function editorHTML(type, ed){
     ed.lines.map(function(l, i){
       var d = l.disc || {t:'%', v:''};
       return '<div class="line">' +
-        '<div><select data-ed="' + type + '" data-i="' + i + '" data-f="pid"><option value="">Ürün seçin</option>' + db.products.map(function(p){ return '<option value="' + p.id + '"' + (l.pid === p.id ? ' selected' : '') + '>' + esc(p.name) + (p.barcode ? ' · ' + esc(p.barcode) : (p.code ? ' (' + esc(p.code) + ')' : '')) + '</option>'; }).join('') + '</select><div class="wn" id="w' + i + '">' + lineInfo(type, ed, i) + '</div></div>' +
+        '<div><select data-ed="' + type + '" data-i="' + i + '" data-f="pid"><option value="">Ürün seçin</option>' + (ed.ref ? docProducts(ed.ref) : db.products).map(function(p){ return '<option value="' + p.id + '"' + (l.pid === p.id ? ' selected' : '') + '>' + esc(p.name) + (p.barcode ? ' · ' + esc(p.barcode) : (p.code ? ' (' + esc(p.code) + ')' : '')) + '</option>'; }).join('') + '</select><div class="wn" id="w' + i + '">' + lineInfo(type, ed, i) + '</div></div>' +
         '<input type="number" inputmode="decimal" step="any" min="0" placeholder="Miktar" value="' + esc(l.qty) + '" data-ed="' + type + '" data-i="' + i + '" data-f="qty" aria-label="Miktar">' +
         '<input class="pc" type="number" inputmode="decimal" step="any" min="0" placeholder="Fiyat (KDV dahil)" value="' + esc(l.price) + '"' + (priceOk ? '' : ' readonly') + ' data-ed="' + type + '" data-i="' + i + '" data-f="price" aria-label="Birim fiyat">' +
         '<div class="lt" id="lt' + i + '">' + money(pls[i].net) + '</div>' +
@@ -773,7 +822,8 @@ function updateTotals(type){
   var pr = edPricing(type, ed), t = pr.total;
   var pls = priceLines(type, ed.date || today(), ed.lines);
   if(ed.pm){
-    ['n', 'k', 'h'].forEach(function(k){ ed.pay[k] = (k === ed.pm && t) ? t : ''; var i = $('#p_' + k); if(i) i.value = ed.pay[k]; });
+    syncPay(ed, t);
+    ['n', 'k', 'h'].forEach(function(k){ var i = $('#p_' + k); if(i) i.value = ed.pay[k]; });
   }
   var paid = edPaid(ed);
   $('#tot').textContent = money(t);
@@ -789,6 +839,33 @@ function updateTotals(type){
     if(c) c.innerHTML = campInfo(type, pl, i);
   });
 }
+function newDq(){ return {sale:{q:'', from:'', to:'', t:''}, purchase:{q:'', from:'', to:'', t:''}}; }
+function docMatch(d, f){
+  if(f.t && d.type !== f.t) return false;
+  if(f.from && d.date < f.from) return false;
+  if(f.to && d.date > f.to) return false;
+  var q = nz(f.q); if(!q) return true;
+  var txt = d.no + ' ' + KIND[d.type] + ' ' + cariName(d.cariId) + ' ' + userName(d.by) + ' ' + (d.note || '') + ' ' + (d.refNo || '') + ' ' + money(d.total) + ' ' + d.lines.map(function(l){
+    var p = prod(l.pid); return p ? p.name + ' ' + (p.code || '') + ' ' + (p.barcode || '') + ' ' + attrText(p) : '';
+  }).join(' ');
+  return nz(txt).indexOf(q) >= 0;
+}
+function docFilterBar(base){
+  var f = state.dq[base], sale = base === 'sale', rt = sale ? 'sret' : 'pret';
+  return '<div class="card" style="padding:10px;margin-bottom:10px"><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">' +
+    '<input type="search" style="flex:1;min-width:200px" data-dq="' + base + '" placeholder="Belge no, cari, ürün, kod, barkod, not veya kullanıcı ara" value="' + esc(f.q) + '" autocomplete="off">' +
+    '<input type="date" style="flex:1 1 140px;width:auto" data-dqd="from" data-b="' + base + '" value="' + esc(f.from) + '" aria-label="Başlangıç tarihi">' +
+    '<input type="date" style="flex:1 1 140px;width:auto" data-dqd="to" data-b="' + base + '" value="' + esc(f.to) + '" aria-label="Bitiş tarihi">' +
+    '<select style="flex:1 1 120px;width:auto" data-dqt="' + base + '"><option value="">Tümü</option><option value="' + base + '"' + (f.t === base ? ' selected' : '') + '>' + (sale ? 'Satışlar' : 'Alışlar') + '</option><option value="' + rt + '"' + (f.t === rt ? ' selected' : '') + '>İadeler</option></select>' +
+    '<button class="btn sm" data-act="dqClear" data-b="' + base + '">Temizle</button></div></div>';
+}
+function docListHTML(base){
+  var ret = base === 'sale' ? 'sret' : 'pret', f = state.dq[base];
+  var list = sortedDocs([base, ret]).filter(function(d){ return docMatch(d, f); });
+  var net = sum(list, function(d){ return d.type === base ? d.total : -d.total; });
+  return docRows(list) + (list.length ? '<div class="muted" style="margin-top:6px;font-size:13px">' + list.length + ' kayıt · net toplam ' + money(r2(net)) + ' (iadeler düşülmüş)</div>' : '');
+}
+function refreshDocList(b){ var l = $('#list'); if(l) l.innerHTML = docListHTML(b); }
 function tradeView(base){
   var ret = base === 'sale' ? 'sret' : 'pret';
   var active = state.ed[base] ? base : (state.ed[ret] ? ret : null);
@@ -797,7 +874,7 @@ function tradeView(base){
     '<div class="bar"><h2>' + (sale ? 'Satışlar' : 'Alışlar') + '</h2><span class="spacer"></span>' +
     (can(DOC_PERM[ret]) ? '<button class="btn" data-act="newDoc" data-type="' + ret + '">' + KIND[ret] + '</button>' : '') +
     (can(DOC_PERM[base]) ? '<button class="btn ' + (sale ? 'sale' : 'buy') + '" data-act="newDoc" data-type="' + base + '">+ Yeni ' + (sale ? 'satış' : 'alış') + '</button>' : '') + '</div>';
-  return head + '<h3 style="margin-top:6px">Geçmiş işlemler</h3>' + docRows(sortedDocs([base, ret]));
+  return head + '<h3 style="margin-top:6px">Geçmiş işlemler</h3>' + docFilterBar(base) + '<div id="list">' + docListHTML(base) + '</div>';
 }
 V.sales = function(){ return tradeView('sale'); };
 V.purchases = function(){ return tradeView('purchase'); };
@@ -996,19 +1073,20 @@ function cariForm(id, after){
 /* Tahsilat / Ödeme */
 V.payments = function(){
   var list = db.payments.slice().sort(function(a, b){ return b.date.localeCompare(a.date) || b.ts - a.ts; });
-  return '<div class="bar"><h2>Tahsilat ve ödemeler</h2><span class="spacer"></span>' + (can('payout') ? '<button class="btn" data-act="newPay" data-dir="out">Cariye ödeme yap</button>' : '') + (can('collect') ? '<button class="btn pri" data-act="newPay" data-dir="in">Tahsilat al</button>' : '') + '</div>' +
-    '<div class="legend">Satış ve alış sırasında peşin girilen tutarlar burada görünmez. Burası sonradan yapılan tahsilat ve ödemeler içindir.</div>' +
+  return '<div class="bar"><h2>Tahsilat ve ödemeler</h2><span class="spacer"></span>' + (can('payout') ? '<button class="btn" data-act="newPay" data-dir="out">Ödeme yap</button>' : '') + (can('collect') ? '<button class="btn pri" data-act="newPay" data-dir="in">Tahsilat al</button>' : '') + '</div>' +
+    '<div class="legend">Satış ve alış sırasında peşin girilen tutarlar burada görünmez. Burası sonradan yapılan tahsilat ve ödemeler içindir. Cari seçmeden genel tahsilat veya ödeme de girebilirsiniz, bunlar yalnızca kasaya işlenir.</div>' +
     (list.length ? '<div class="tbl"><table><thead><tr><th>Tarih</th><th>Tür</th><th>Cari</th><th>Yöntem</th><th>Not</th><th class="r">Tutar</th><th></th></tr></thead><tbody>' + list.map(function(p){
-      return '<tr><td class="nw">' + fd(p.date) + '</td><td>' + tag(p.dir) + '</td><td>' + esc(cariName(p.cariId)) + '</td><td>' + esc(p.method) + '</td><td class="muted">' + esc(p.note || '') + '</td><td class="r">' + money(p.amount) + '</td><td class="r"><button class="btn sm" data-act="receipt" data-kind="pay" data-id="' + p.id + '">Makbuz</button> ' + (can('payments.delete') ? '<button class="btn sm danger" data-act="delPay" data-id="' + p.id + '">Sil</button>' : '') + '</td></tr>';
+      return '<tr><td class="nw">' + fd(p.date) + '</td><td>' + tag(p.dir) + '</td><td>' + esc(payWho(p.cariId)) + '</td><td>' + esc(p.method) + '</td><td class="muted">' + esc(p.note || '') + '</td><td class="r">' + money(p.amount) + '</td><td class="r"><button class="btn sm" data-act="receipt" data-kind="pay" data-id="' + p.id + '">Makbuz</button> ' + (can('payments.delete') ? '<button class="btn sm danger" data-act="delPay" data-id="' + p.id + '">Sil</button>' : '') + '</td></tr>';
     }).join('') + '</tbody></table></div>' : '<div class="empty">Kayıt yok.</div>');
 };
+function payWho(id){ return id ? cariName(id) : 'Cari yok'; }
 function payForm(dir, cid){
-  if(!db.caris.length){ toast('Önce cari ekleyin', 'err'); return; }
   var cs = db.caris.slice().sort(function(a, b){ return a.name.localeCompare(b.name, 'tr'); });
   var isIn = dir === 'in';
-  modal(isIn ? 'Tahsilat al' : 'Cariye ödeme yap',
+  modal(isIn ? 'Tahsilat al' : 'Ödeme yap',
     (cid ? '<div class="hint">' + esc(cariName(cid)) + ': ' + balHTML(balanceOf(cid)) + '</div>' : '') +
-    fld('Cari', '<select name="cariId" required>' + (cid ? '' : '<option value="">Seçin</option>') + cs.map(function(c){ return '<option value="' + c.id + '"' + (c.id === cid ? ' selected' : '') + '>' + esc(c.name) + ' · ' + (balanceOf(c.id) > 0.004 ? 'Alacak ' + money(balanceOf(c.id)) : balanceOf(c.id) < -0.004 ? 'Borç ' + money(-balanceOf(c.id)) : 'Kapalı') + '</option>'; }).join('') + '</select>') +
+    fld('Cari (isteğe bağlı)', '<select name="cariId"><option value="">— Cari yok (genel ' + (isIn ? 'tahsilat' : 'ödeme') + ') —</option>' + cs.map(function(c){ return '<option value="' + c.id + '"' + (c.id === cid ? ' selected' : '') + '>' + esc(c.name) + ' · ' + (balanceOf(c.id) > 0.004 ? 'Alacak ' + money(balanceOf(c.id)) : balanceOf(c.id) < -0.004 ? 'Borç ' + money(-balanceOf(c.id)) : 'Kapalı') + '</option>'; }).join('') + '</select>') +
+    '<div class="muted" style="margin:-4px 0 10px;font-size:12px">Cari seçmezseniz tutar yalnızca kasaya işlenir, hiçbir cari hesabın bakiyesini etkilemez. Açıklamayı Not alanına yazabilirsiniz.</div>' +
     '<div class="cols">' +
       fld('Tutar (₺)', '<input name="amount" type="number" step="any" min="0" required>') +
       fld('Tarih', '<input name="date" type="date" value="' + today() + '">') +
@@ -1017,9 +1095,8 @@ function payForm(dir, cid){
     '</div>',
     function(f){
       var a = num(f.amount);
-      if(!f.cariId){ toast('Cari seçin', 'err'); return false; }
       if(a <= 0){ toast('Tutar girin', 'err'); return false; }
-      db.payments.push({id:uid(), cariId:f.cariId, dir:dir, amount:r2(a), date:f.date || today(), method:f.method, note:f.note.trim(), by:(cur() || {}).id || '', ts:Date.now()});
+      db.payments.push({id:uid(), cariId:f.cariId || '', dir:dir, amount:r2(a), date:f.date || today(), method:f.method, note:f.note.trim(), by:(cur() || {}).id || '', ts:Date.now()});
       commit(); toast(isIn ? 'Tahsilat kaydedildi' : 'Ödeme kaydedildi');
     }, 'Kaydet');
 }
@@ -1035,7 +1112,7 @@ function repData(){
 function repTx(){
   var d = repData(), rows = [];
   d.docs.forEach(function(x){ rows.push({date:x.date, ts:x.ts, kind:x.type, no:x.no, who:x.cariId, amt:x.total, paid:x.paid, rest:r2(x.total - x.paid), by:x.by}); });
-  d.pays.forEach(function(p){ rows.push({date:p.date, ts:p.ts, kind:p.dir, no:'—', who:p.cariId, amt:p.amount, paid:p.amount, rest:0, by:p.by}); });
+  d.pays.forEach(function(p){ rows.push({date:p.date, ts:p.ts, kind:p.dir, no:'—', who:p.cariId, isPay:true, amt:p.amount, paid:p.amount, rest:0, by:p.by}); });
   rows.sort(function(a, b){ return b.date.localeCompare(a.date) || b.ts - a.ts; });
   return rows;
 }
@@ -1083,7 +1160,7 @@ V.reports = function(){
     var o = cm[x.cariId] || (cm[x.cariId] = {s:0, b:0, p:0});
     if(x.type === 'sale') o.s += x.total; else if(x.type === 'sret') o.s -= x.total; else if(x.type === 'purchase') o.b += x.total; else o.b -= x.total;
   });
-  d.pays.forEach(function(p){ var o = cm[p.cariId] || (cm[p.cariId] = {s:0, b:0, p:0}); o.p += p.amount; });
+  d.pays.forEach(function(p){ if(!p.cariId) return; var o = cm[p.cariId] || (cm[p.cariId] = {s:0, b:0, p:0}); o.p += p.amount; });
   var crows = Object.keys(cm).map(function(id){ return {id:id, o:cm[id]}; }).sort(function(a, b){ return (b.o.s + b.o.b) - (a.o.s + a.o.b); });
   var tx = repTx().filter(function(t){ return r.type === 'all' || t.kind === r.type; });
   return '<div class="bar"><h2>Raporlar</h2><span class="spacer"></span><button class="btn" data-act="copyRep">Tabloyu kopyala</button></div>' + repFilters() +
@@ -1113,7 +1190,7 @@ V.reports = function(){
   }).join('') + '</tbody></table></div>' : '<div class="empty">Bu aralıkta cari hareketi yok.</div>') +
   '<div class="bar"><h3 style="margin:0">İşlem dökümü</h3><span class="spacer"></span><div class="chips">' + [['all', 'Hepsi'], ['sale', 'Satış'], ['purchase', 'Alış'], ['sret', 'Satış iadesi'], ['pret', 'Alış iadesi'], ['in', 'Tahsilat'], ['out', 'Ödeme']].map(function(t){ return '<button class="chip' + (r.type === t[0] ? ' on' : '') + '" data-act="repType" data-t="' + t[0] + '">' + t[1] + '</button>'; }).join('') + '</div></div>' +
   (tx.length ? '<div class="tbl"><table><thead><tr><th>Tarih</th><th>Tür</th><th>No</th><th>Cari</th><th>Kullanıcı</th><th class="r">Tutar</th><th class="r">Ödenen</th><th class="r">Kalan</th></tr></thead><tbody>' + tx.map(function(t){
-    return '<tr><td class="nw">' + fd(t.date) + '</td><td>' + tag(t.kind) + '</td><td>' + esc(t.no) + '</td><td>' + esc(cariName(t.who)) + '</td><td>' + esc(userName(t.by)) + '</td><td class="r">' + money(t.amt) + '</td><td class="r">' + money(t.paid) + '</td><td class="r">' + (t.rest > 0.004 ? '<span class="neg">' + money(t.rest) + '</span>' : '<span class="muted">—</span>') + '</td></tr>';
+    return '<tr><td class="nw">' + fd(t.date) + '</td><td>' + tag(t.kind) + '</td><td>' + esc(t.no) + '</td><td>' + esc(t.isPay ? payWho(t.who) : cariName(t.who)) + '</td><td>' + esc(userName(t.by)) + '</td><td class="r">' + money(t.amt) + '</td><td class="r">' + money(t.paid) + '</td><td class="r">' + (t.rest > 0.004 ? '<span class="neg">' + money(t.rest) + '</span>' : '<span class="muted">—</span>') + '</td></tr>';
   }).join('') + '</tbody></table></div>' : '<div class="empty">Kayıt yok.</div>');
 };
 
@@ -1163,7 +1240,7 @@ V.payrep = function(){
   }).join('') + '</tbody></table></div>' : '<div class="empty">Bu aralıkta kasa hareketi yok.</div>') +
   '<div class="bar"><h3 style="margin:0">Kasa hareketleri</h3><span class="spacer"></span><div class="chips">' + [''].concat(names).map(function(n){ return '<button class="chip' + (r.method === n ? ' on' : '') + '" data-act="repMethod" data-m="' + esc(n) + '">' + (n || 'Hepsi') + '</button>'; }).join('') + '</div></div>' +
   (cap.length ? '<div class="tbl"><table><thead><tr><th>Tarih</th><th>Kaynak</th><th>Cari</th><th>Yöntem</th><th>Kullanıcı</th><th class="r">Tutar</th></tr></thead><tbody>' + cap.map(function(m){
-    return '<tr><td class="nw">' + fd(m.date) + '</td><td>' + esc(m.src) + '</td><td>' + esc(cariName(m.who)) + '</td><td>' + esc(m.method) + '</td><td>' + esc(userName(m.by)) + '</td><td class="r ' + (m.dir === 'in' ? 'pos' : 'neg') + '">' + (m.dir === 'in' ? '+' : '−') + money(m.amt) + '</td></tr>';
+    return '<tr><td class="nw">' + fd(m.date) + '</td><td>' + esc(m.src) + '</td><td>' + esc(m.whoName) + '</td><td>' + esc(m.method) + '</td><td>' + esc(userName(m.by)) + '</td><td class="r ' + (m.dir === 'in' ? 'pos' : 'neg') + '">' + (m.dir === 'in' ? '+' : '−') + money(m.amt) + '</td></tr>';
   }).join('') + '</tbody></table></div>' + (list.length > cap.length ? '<div class="muted">İlk 500 hareket gösteriliyor. Dar bir tarih aralığı seçin.</div>' : '') : '<div class="empty">Kayıt yok.</div>');
 };
 
@@ -1176,8 +1253,8 @@ V.settings = function(){
     fld('Telefon', '<input id="s_phone" value="' + esc(db.settings.phone) + '">') +
     fld('Adres', '<input id="s_addr" value="' + esc(db.settings.address) + '">') +
     fld('Vergi dairesi / no', '<input id="s_tax" value="' + esc(db.settings.taxNo) + '">') +
-    '</div>' + fld('Fiş alt notu', '<input id="s_foot" value="' + esc(db.settings.footer) + '" placeholder="Teşekkür ederiz">') +
-    '<button class="btn pri" data-act="saveName">Kaydet</button></div>' + logoCard() : '') +
+    '</div>' +
+    '<button class="btn pri" data-act="saveName">Kaydet</button></div>' + logoCard() + rcCard() + lblCard() + menusCard() : '') +
   (adm ? usersCard() : '') +
   (adm ? '<div class="card"><h3>Yedekleme</h3><p class="muted" style="margin-top:0">Veriler bu tarayıcıda saklanır. Tarayıcı verisini temizlerseniz silinir; bu yüzden düzenli olarak yedek alın. Yedek kullanıcıları ve şifre özetlerini de içerir, güvenli bir yerde saklayın.</p>' +
     '<div class="row-end" style="justify-content:flex-start;margin-bottom:10px"><button class="btn" data-act="downloadBackup">Yedek dosyası indir</button><button class="btn" data-act="exportData">Yedek metni oluştur</button><label class="btn" style="cursor:pointer;margin:0">Dosyadan geri yükle<input type="file" id="bkfile" accept=".json,application/json,text/plain" style="display:none"></label><button class="btn" data-act="importData">Kutudaki metinden geri yükle</button></div>' +
@@ -1187,7 +1264,7 @@ V.settings = function(){
 
 /* ---------- Olaylar ---------- */
 var A = {};
-A.go = function(d){ state.tab = d.tab; state.cariId = null; if(d.tab === 'stock') state.sq = {q:'', attrs:['', '', '', '', ''], st:''}; render(); window.scrollTo(0, 0); };
+A.go = function(d){ document.body.classList.remove('navopen'); state.tab = d.tab; state.cariId = null; state.dq = newDq(); if(d.tab === 'stock') state.sq = {q:'', attrs:['', '', '', '', ''], st:''}; render(); window.scrollTo(0, 0); };
 A.closeModal = closeModal;
 A.quick = function(d){ if(!can(DOC_PERM[d.type])){ toast('Bu işlem için yetkiniz yok', 'err'); return; } state.tab = d.type === 'sale' ? 'sales' : 'purchases'; A.newDoc(d); window.scrollTo(0, 0); };
 A.newDoc = function(d){
@@ -1210,6 +1287,7 @@ A.saveDoc = function(d){
     if(!can('sales.price')){ ed.lines.forEach(function(l){ var p0 = prod(l.pid); if(p0) l.price = p0.price; }); }
   }
   var pr = edPricing(type, ed);
+  syncPay(ed, pr.total);
   if(!pr.lines.length){ toast('En az bir ürün ve miktar girin', 'err'); return; }
   var total = pr.total;
   var pays = {};
@@ -1217,7 +1295,13 @@ A.saveDoc = function(d){
   var paid = r2(sum(Object.keys(pays), function(m){ return pays[m]; }));
   if(paid > total + 0.004){ toast('Ödeme toplamı fiş tutarını aşıyor', 'err'); return; }
   if(!ed.cariId && paid < total - 0.004){ toast('Cari seçmeden kalan tutar bırakılamaz. Cari seçin ya da tamamını ödeme olarak girin.', 'err'); return; }
-  var nd = createDoc({type:type, date:ed.date || today(), cariId:ed.cariId, lines:ed.lines, docDisc:ed.docDisc, pays:pays, note:ed.note});
+  if(ed.ref && (type === 'sret' || type === 'pret')){
+    var byp = {};
+    pr.lines.forEach(function(l){ byp[l.pid] = (byp[l.pid] || 0) + l.qty; });
+    var bad = Object.keys(byp).find(function(pid){ return byp[pid] > remainingQty(ed.ref, pid) + 0.0001; });
+    if(bad){ toast('İade miktarı kalan iade edilebilir miktarı aşıyor: ' + ((prod(bad) || {}).name || '') + ' (en fazla ' + qf(remainingQty(ed.ref, bad)) + ')', 'err'); return; }
+  }
+  var nd = createDoc({type:type, date:ed.date || today(), cariId:ed.cariId, lines:ed.lines, docDisc:ed.docDisc, pays:pays, note:ed.note, ref:ed.ref});
   state.ed[type] = null; commit(); toast(KIND[type] + ' kaydedildi');
   if(type === 'sale' || type === 'sret') A.receipt({kind:'doc', id:nd.id});
 };
@@ -1227,18 +1311,23 @@ A.openDoc = function(d){
   var rest = r2(x.total - x.paid), vs = vatSplit(x.lines), pp = docPays(x);
   var pm = Object.keys(pp).map(function(m){ return esc(m) + ' ' + money(pp[m]); }).join(' · ');
   var disc = x.gross != null ? r2(x.gross - x.total) : 0;
+  var lrs = db.docs.filter(function(y){ return y.ref === x.id; });
+  var lrHtml = lrs.length ? '<div class="muted" style="margin-top:8px;font-size:13px">Bağlı iadeler: ' + lrs.map(function(y){ return esc(y.no) + ' (' + money(y.total) + ')'; }).join(', ') + '</div>' : '';
+  var retT = x.type === 'sale' ? 'sret' : x.type === 'purchase' ? 'pret' : '';
+  var refBtn = (retT && can(DOC_PERM[retT]) && docHasRemaining(x)) ? '<button type="button" class="btn" data-act="refundDoc" data-id="' + x.id + '">' + (retT === 'sret' ? 'İade al' : 'İade yap') + '</button>' : '';
   modal(KIND[x.type] + ' ' + x.no,
-    '<div class="hint">' + fd(x.date) + ' · ' + esc(cariName(x.cariId)) + (x.note ? ' · ' + esc(x.note) : '') + (x.by ? ' · ' + esc(userName(x.by)) : '') + '</div>' +
+    '<div class="hint">' + fd(x.date) + ' · ' + esc(cariName(x.cariId)) + (x.note ? ' · ' + esc(x.note) : '') + (x.by ? ' · ' + esc(userName(x.by)) : '') + (x.refNo ? ' · Bağlı belge: ' + esc(x.refNo) : '') + '</div>' +
     '<div class="tbl"><table><thead><tr><th>Ürün</th><th class="r">Miktar</th><th class="r">Fiyat</th><th class="r">İndirim</th><th class="r">Tutar</th></tr></thead><tbody>' + x.lines.map(function(l){
       var p = prod(l.pid), ld = r2(lg(l) - lt(l));
       return '<tr><td>' + esc(p ? p.name : '(silinmiş)') + '</td><td class="r">' + qf(l.qty) + ' ' + esc(p ? p.unit : '') + '</td><td class="r">' + money(l.price) + '</td><td class="r">' + (ld > 0.004 ? '−' + money(ld) + (l.camp ? '<div class="muted">' + esc(l.camp) + '</div>' : '') : '') + '</td><td class="r">' + money(lt(l)) + '</td></tr>';
     }).join('') + '</tbody></table></div>' +
-    '<p style="text-align:right;margin:10px 0 0">' + (disc > 0.004 ? '<span class="muted">Ara toplam ' + money(x.gross) + ' · İndirim −' + money(disc) + '</span><br>' : '') + '<span class="muted">KDV hariç ' + money(vs.net) + ' · KDV ' + money(vs.vat) + '</span><br><b>Toplam ' + money(x.total) + '</b><br><span class="muted">' + TYPES[x.type].paidLabel + ' ' + money(x.paid) + (pm ? ' (' + pm + ')' : '') + '</span> · Kalan ' + money(rest) + '</p>',
-    null, null, '<button type="button" class="btn" data-act="receipt" data-kind="doc" data-id="' + x.id + '">Fiş yazdır</button>' + (can(DOC_DEL[x.type]) ? '<button type="button" class="btn danger" data-act="delDoc" data-id="' + x.id + '">Sil</button>' : ''), true);
+    lrHtml + '<p style="text-align:right;margin:10px 0 0">' + (disc > 0.004 ? '<span class="muted">Ara toplam ' + money(x.gross) + ' · İndirim −' + money(disc) + '</span><br>' : '') + '<span class="muted">KDV hariç ' + money(vs.net) + ' · KDV ' + money(vs.vat) + '</span><br><b>Toplam ' + money(x.total) + '</b><br><span class="muted">' + TYPES[x.type].paidLabel + ' ' + money(x.paid) + (pm ? ' (' + pm + ')' : '') + '</span> · Kalan ' + money(rest) + '</p>',
+    null, null, refBtn + '<button type="button" class="btn" data-act="receipt" data-kind="doc" data-id="' + x.id + '">Fiş yazdır</button>' + (can(DOC_DEL[x.type]) ? '<button type="button" class="btn danger" data-act="delDoc" data-id="' + x.id + '">Sil</button>' : ''), true);
 };
 A.delDoc = function(d){
   var xd = db.docs.find(function(y){ return y.id === d.id; });
   if(xd && !can(DOC_DEL[xd.type])){ toast('Bu işlem için yetkiniz yok', 'err'); return; }
+  if(xd && db.docs.some(function(y){ return y.ref === xd.id; })){ toast('Bu belgeye bağlı iade kayıtları var. Önce iadeleri silin.', 'err'); return; }
   confirmBox('Bu işlem silinecek ve stok hareketleri geri alınacak. Devam edilsin mi?', function(){
     db.docs = db.docs.filter(function(x){ return x.id !== d.id; });
     db.moves = db.moves.filter(function(m){ return m.ref !== d.id; });
@@ -1278,13 +1367,13 @@ A.repPreset = function(d){
 A.repType = function(d){ state.rep.type = d.t; render(); };
 A.copyRep = function(){
   var rows = repTx().filter(function(t){ return state.rep.type === 'all' || t.kind === state.rep.type; });
-  var txt = ['Tarih','Tür','No','Cari','Kullanıcı','Tutar','Ödenen','Kalan'].join('\t') + '\n' + rows.map(function(t){ return [fd(t.date), KIND[t.kind], t.no, cariName(t.who), userName(t.by), t.amt, t.paid, t.rest].join('\t'); }).join('\n');
+  var txt = ['Tarih','Tür','No','Cari','Kullanıcı','Tutar','Ödenen','Kalan'].join('\t') + '\n' + rows.map(function(t){ return [fd(t.date), KIND[t.kind], t.no, (t.isPay ? payWho(t.who) : cariName(t.who)), userName(t.by), t.amt, t.paid, t.rest].join('\t'); }).join('\n');
   try{ navigator.clipboard.writeText(txt); }catch(e){}
   modal('İşlem dökümü', '<p class="muted" style="margin-top:0">Metin panoya kopyalandı. Kopyalanmadıysa aşağıdan seçip kopyalayın. Excel veya Sheets içine yapıştırabilirsiniz.</p><textarea rows="8" onfocus="this.select()">' + esc(txt) + '</textarea>', null);
 };
 A.saveName = function(){
   var g = function(id){ return $(id).value.trim(); };
-  db.settings.name = g('#s_name'); db.settings.phone = g('#s_phone'); db.settings.address = g('#s_addr'); db.settings.taxNo = g('#s_tax'); db.settings.footer = g('#s_foot');
+  db.settings.name = g('#s_name'); db.settings.phone = g('#s_phone'); db.settings.address = g('#s_addr'); db.settings.taxNo = g('#s_tax');
   commit(); toast('Kaydedildi');
 };
 A.exportData = function(){ var t = $('#bk'); t.value = JSON.stringify(db); t.select(); try{ navigator.clipboard.writeText(t.value); toast('Yedek metni kopyalandı'); }catch(e){ toast('Metni seçip kopyalayın'); } };
@@ -1365,6 +1454,14 @@ function onEd(e){
     }
   } else if(f.indexOf('pay_') === 0){
     ed.pay[f.slice(4)] = t.value; ed.pm = null;
+  } else if(f === 'refq'){
+    var nr = t.value.split(' · ')[0].trim().toLowerCase(), bt = type === 'sret' ? 'sale' : 'purchase';
+    var rd0 = db.docs.find(function(x){ return x.type === bt && x.no.toLowerCase() === nr; });
+    if(rd0){
+      if(!docHasRemaining(rd0)){ toast('Bu belgenin tamamı zaten iade edilmiş', 'err'); return; }
+      ed.ref = rd0.id; applyRef(type, ed); render();
+    }
+    return;
   } else if(f === 'ddt' || f === 'ddv'){
     ed.docDisc = ed.docDisc || {t:'%', v:''}; ed.docDisc[f === 'ddt' ? 't' : 'v'] = t.value;
   } else {
@@ -1396,11 +1493,13 @@ document.addEventListener('keydown', function(e){
 });
 document.addEventListener('input', function(e){
   var t = e.target;
+  if(t.dataset.lb !== undefined){ lbChange(t); return; }
   if(t.id === 'stq'){ state.sq.q = t.value; stRefresh(); return; }
   if(t.id === 'bbq'){ bbFilter(); return; }
   if(t.id === 'lblq'){ lblFilter(); return; }
   if(t.name === 'barcode' && $('#bcprev')){ $('#bcprev').innerHTML = ean13Svg(t.value.trim()); return; }
-  if(t.dataset.q){ state.q[t.dataset.q] = t.value; $('#list').innerHTML = t.dataset.q === 'products' ? prodList() : cariList(); return; }
+  if(t.dataset.dq){ state.dq[t.dataset.dq].q = t.value; refreshDocList(t.dataset.dq); return; }
+  if(t.dataset.q){ state.q[t.dataset.q] = t.value; $('#list').innerHTML = ({products:prodList, caris:cariList, campaigns:campList})[t.dataset.q](); return; }
   if(t.tagName !== 'SELECT') onEd(e);
 });
 document.addEventListener('change', function(e){
@@ -1418,6 +1517,9 @@ document.addEventListener('change', function(e){
   if(t.name === 'role' && $('#permbox')){ $('#permbox').hidden = t.value === 'admin'; return; }
   if(t.id === 'logoRcpt'){ if(can('settings.edit')){ db.settings.logoRcpt = t.checked; save(); } return; }
   if(t.id === 'staffRefund'){ db.settings.staffRefund = t.checked; commit(); toast(t.checked ? 'Personel satış iadesi yapabilir' : 'Satış iadesi yalnızca yöneticide'); return; }
+  if(t.dataset.lb !== undefined){ lbChange(t); return; }
+  if(t.dataset.dqd){ state.dq[t.dataset.b][t.dataset.dqd] = t.value; refreshDocList(t.dataset.b); return; }
+  if(t.dataset.dqt){ state.dq[t.dataset.dqt].t = t.value; refreshDocList(t.dataset.dqt); return; }
   if(t.dataset.bbf !== undefined){ bbFilter(); return; }
   if(t.dataset.lblf !== undefined){ lblFilter(); return; }
   if((t.name === 'type' || t.name === 'scope' || t.name === 'ai') && $('#mf')) campToggle();
@@ -1425,15 +1527,22 @@ document.addEventListener('change', function(e){
 });
 
 /* ---------- Kampanyalar ---------- */
+function campStatus(c, t){ return c.active === false ? 'Pasif' : campActive(c, t) ? 'Geçerli' : 'Tarih dışı'; }
+function campList(){
+  if(!db.campaigns.length) return '<div class="empty">Henüz kampanya yok. Örnekler: “Çay ürünlerinde %10 indirim”, “3 al 2 öde”.</div>';
+  var t = today(), q = nz(state.q.campaigns);
+  var list = db.campaigns.filter(function(c){ return !q || nz(c.name + ' ' + campText(c) + ' ' + campScope(c) + ' ' + campStatus(c, t) + ' ' + (c.from || '') + ' ' + (c.to || '')).indexOf(q) >= 0; });
+  if(!list.length) return '<div class="empty">Aramanıza uyan kampanya yok.</div>';
+  return '<div class="tbl"><table><thead><tr><th>Kampanya</th><th>Kural</th><th>Kapsam</th><th>Tarih</th><th>Durum</th><th></th></tr></thead><tbody>' + list.map(function(c){
+    var st = c.active === false ? '<span class="tag bad">Pasif</span>' : campActive(c, t) ? '<span class="tag sale">Geçerli</span>' : '<span class="tag warn">Tarih dışı</span>';
+    var dt = (c.from || c.to) ? (c.from ? fd(c.from) : '…') + ' – ' + (c.to ? fd(c.to) : '…') : 'Süresiz';
+    return '<tr><td><b>' + esc(c.name) + '</b></td><td>' + esc(campText(c)) + '</td><td>' + esc(campScope(c)) + '</td><td class="nw">' + dt + '</td><td>' + st + '</td><td class="r">' + (can('campaigns.edit') ? '<button class="btn sm" data-act="togCamp" data-id="' + c.id + '">' + (c.active === false ? 'Aç' : 'Kapat') + '</button> <button class="btn sm" data-act="editCamp" data-id="' + c.id + '">Düzenle</button> <button class="btn sm danger" data-act="delCamp" data-id="' + c.id + '">Sil</button>' : '') + '</td></tr>';
+  }).join('') + '</tbody></table></div>';
+}
 V.campaigns = function(){
-  var t = today();
   return '<div class="bar"><h2>Kampanyalar</h2><span class="spacer"></span>' + (can('campaigns.edit') ? '<button class="btn pri" data-act="newCamp">+ Yeni kampanya</button>' : '') + '</div>' +
     '<div class="legend">Kampanyalar yalnızca satışlarda, tarih aralığı içinde ve kapsama uyan ürünlerde otomatik uygulanır. Bir ürüne birden fazla kampanya uyarsa en çok indirim sağlayanı geçerli olur, kampanyalar toplanmaz. Satış ekranında satır bazında kaldırabilirsiniz. Manuel iskonto, kampanyadan sonra kalan tutara uygulanır. “N al M öde” kampanyası varsayılan olarak sepet bazında çalışır: kapsama giren tüm ürünler birlikte sayılır ve her N ürünün en ucuz (N−M) tanesi bedava olur.</div>' +
-    (db.campaigns.length ? '<div class="tbl"><table><thead><tr><th>Kampanya</th><th>Kural</th><th>Kapsam</th><th>Tarih</th><th>Durum</th><th></th></tr></thead><tbody>' + db.campaigns.map(function(c){
-      var st = c.active === false ? '<span class="tag bad">Pasif</span>' : campActive(c, t) ? '<span class="tag sale">Geçerli</span>' : '<span class="tag warn">Tarih dışı</span>';
-      var dt = (c.from || c.to) ? (c.from ? fd(c.from) : '…') + ' – ' + (c.to ? fd(c.to) : '…') : 'Süresiz';
-      return '<tr><td><b>' + esc(c.name) + '</b></td><td>' + esc(campText(c)) + '</td><td>' + esc(campScope(c)) + '</td><td class="nw">' + dt + '</td><td>' + st + '</td><td class="r">' + (can('campaigns.edit') ? '<button class="btn sm" data-act="togCamp" data-id="' + c.id + '">' + (c.active === false ? 'Aç' : 'Kapat') + '</button> <button class="btn sm" data-act="editCamp" data-id="' + c.id + '">Düzenle</button> <button class="btn sm danger" data-act="delCamp" data-id="' + c.id + '">Sil</button>' : '') + '</td></tr>';
-    }).join('') + '</tbody></table></div>' : '<div class="empty">Henüz kampanya yok. Örnekler: “Çay ürünlerinde %10 indirim”, “3 al 2 öde”.</div>');
+    '<div class="card" style="padding:10px"><input class="search" style="max-width:none" type="search" data-q="campaigns" placeholder="Kampanya adı, kural, kapsam veya durum ara" value="' + esc(state.q.campaigns) + '" autocomplete="off"></div><div id="list">' + campList() + '</div>';
 };
 function campToggle(){
   var f = $('#mf'); if(!f || !f.elements.type || !f.elements.scope) return;
@@ -1492,9 +1601,10 @@ A.genEan = function(){
 };
 A.label = function(d){
   var p = prod(d.id); if(!p || !p.barcode) return;
-  var h = '<div class="rcpt"><div class="c"><b>' + esc(p.name) + '</b></div><div class="c">' + (ean13Svg(p.barcode) || ('<div>' + esc(p.barcode) + '</div>')) + '</div><div class="c b">' + money(p.price) + '</div></div>';
-  lastRcpt = {html:h, name:'etiket-' + (p.code || p.barcode)};
-  modal('Barkod etiketi', h, null, null, '<button type="button" class="btn" data-act="saveRcpt">Dosya olarak kaydet</button><button type="button" class="btn pri" data-act="printRcpt">Yazdır</button>');
+  var o = lblOpt(); applyLblCss(o);
+  var h = '<div class="lbls2">' + labelHTML(p, o) + '</div>';
+  lastRcpt = {html:h, name:'etiket-' + (p.code || p.barcode), pageCss:lblPage(o), css:lblCss(o) + lblPage(o)};
+  modal('Barkod etiketi', '<div class="lblbox" style="overflow:auto">' + h + '</div><div class="muted noprint" style="font-size:12px;margin-top:6px">' + esc(lblSummary(o)) + '. Yazdırırken ölçeği %100 seçin.</div>', null, null, '<button type="button" class="btn" data-act="saveRcpt">Dosya olarak kaydet</button><button type="button" class="btn pri" data-act="printRcpt">Yazdır</button>');
 };
 A.saveAttrs = function(){
   db.settings.attrs = [0, 1, 2, 3, 4].map(function(i){ return $('#s_at' + i).value.trim(); });
@@ -1886,6 +1996,238 @@ A.impExcel = function(){
     }, 'Önizle', null, true);
 };
 
+/* ---------- Bağlı iade ---------- */
+function origDoc(id){ return db.docs.find(function(d){ return d.id === id; }); }
+function returnedQty(origId, pid){
+  return sum(db.docs.filter(function(d){ return d.ref === origId && (d.type === 'sret' || d.type === 'pret'); }), function(d){ return sum(d.lines.filter(function(l){ return l.pid === pid; }), function(l){ return l.qty; }); });
+}
+function remainingQty(origId, pid){
+  var o = origDoc(origId); if(!o) return 0;
+  var sold = sum(o.lines.filter(function(l){ return l.pid === pid; }), function(l){ return l.qty; });
+  return r2(sold - returnedQty(origId, pid));
+}
+function docHasRemaining(o){ return o.lines.some(function(l){ return remainingQty(o.id, l.pid) > 0.0001; }); }
+function docProducts(id){
+  var o = origDoc(id), seen = {}, out = [];
+  if(o) o.lines.forEach(function(l){ var p = prod(l.pid); if(p && !seen[p.id]){ seen[p.id] = 1; out.push(p); } });
+  return out;
+}
+function refLabel(d){ return d.no + ' · ' + fd(d.date) + ' · ' + cariName(d.cariId) + ' · ' + money(d.total); }
+function refOptions(type){
+  var base = type === 'sret' ? 'sale' : 'purchase';
+  return db.docs.filter(function(d){ return d.type === base && docHasRemaining(d); }).sort(function(a, b){ return b.date.localeCompare(a.date) || b.ts - a.ts; }).slice(0, 400).map(function(d){ return '<option value="' + esc(refLabel(d)) + '">'; }).join('');
+}
+function applyRef(type, ed){
+  var o = origDoc(ed.ref);
+  if(!o){ ed.ref = ''; return; }
+  ed.cariId = o.cariId || '';
+  var ls = [], seen = {};
+  o.lines.forEach(function(l){
+    if(seen[l.pid]) return; seen[l.pid] = 1;
+    var rem = remainingQty(o.id, l.pid); if(rem <= 0.0001) return;
+    var tl = o.lines.filter(function(x){ return x.pid === l.pid; }), q = sum(tl, function(x){ return x.qty; }), net = sum(tl, function(x){ return lt(x); });
+    ls.push({pid:l.pid, qty:String(rem), price:String(Math.round(net / q * 10000) / 10000)});
+  });
+  ed.lines = ls.length ? ls : [{pid:'', qty:1, price:''}];
+  ed.pm = 'ref';
+}
+A.refClear = function(d){ var ed = state.ed[d.type]; if(ed){ ed.ref = ''; if(ed.pm === 'ref') ed.pm = 'n'; render(); } };
+A.refundDoc = function(d){
+  var x = origDoc(d.id); if(!x) return;
+  var type = x.type === 'sale' ? 'sret' : x.type === 'purchase' ? 'pret' : '';
+  if(!type) return;
+  if(!can(DOC_PERM[type]) || !can(DOC_VIEW[x.type])){ toast('Bu işlem için yetkiniz yok', 'err'); return; }
+  if(!docHasRemaining(x)){ toast('Bu belgenin tamamı zaten iade edilmiş', 'err'); return; }
+  closeModal();
+  state.tab = x.type === 'sale' ? 'sales' : 'purchases';
+  state.ed[type] = {cariId:'', date:today(), lines:[{pid:'', qty:1, price:''}], pay:{n:'', k:'', h:''}, pm:'n', note:'', ref:x.id};
+  applyRef(type, state.ed[type]);
+  render(); window.scrollTo(0, 0);
+};
+A.dqClear = function(d){ state.dq[d.b] = {q:'', from:'', to:'', t:''}; render(); };
+A.toggleNav = function(){ document.body.classList.toggle('navopen'); };
+
+/* ---------- Menü adları ve fiş tasarımı ayarları ---------- */
+function menuLabel(t){ var m = db.settings && db.settings.menus; return (m && m[t[0]]) ? m[t[0]] : t[1]; }
+function menusCard(){
+  var m = (db.settings && db.settings.menus) || {};
+  return '<div class="card"><h3>Menü adları</h3><p class="muted" style="margin-top:0">Soldaki menüde görünen adları değiştirebilirsiniz. Boş bırakılan ad varsayılan adına döner.</p><div class="cols3">' +
+    TABS.map(function(t){ return fld(esc(t[1]), '<input id="mn_' + t[0] + '" value="' + esc(m[t[0]] || '') + '" placeholder="' + esc(t[1]) + '">'); }).join('') +
+    '</div><div class="row-end" style="justify-content:flex-start"><button class="btn pri" data-act="saveMenus">Kaydet</button><button class="btn" data-act="menusReset">Varsayılana dön</button></div></div>';
+}
+A.saveMenus = function(){
+  var m = {}; TABS.forEach(function(t){ var v = ($('#mn_' + t[0]).value || '').trim(); if(v) m[t[0]] = v; });
+  db.settings.menus = m; commit(); toast('Menü adları kaydedildi');
+};
+A.menusReset = function(){ db.settings.menus = {}; commit(); toast('Varsayılan menü adlarına dönüldü'); };
+function rcCard(){
+  var o = rcOpt();
+  var chk = function(id, label){ return '<label class="chk pk"><input type="checkbox" data-rc="' + id + '"' + (o[id] ? ' checked' : '') + '> ' + label + '</label>'; };
+  var kinds = [['sale', 'Satış'], ['purchase', 'Alış'], ['sret', 'Satış iadesi'], ['pret', 'Alış iadesi'], ['in', 'Tahsilat'], ['out', 'Ödeme']];
+  return '<div class="card"><h3>Fiş tasarımı</h3><p class="muted" style="margin-top:0">Fişte hangi bilgilerin görüneceğini, fiş başlıklarını ve her işlem türü için ayrı alt notu belirleyin. Alt notlar standart olarak boştur. Sonucu görmek için bir işlemin fişini açabilirsiniz.</p>' +
+    '<div class="pgrp" style="margin-bottom:12px"><div class="pgt">Fişte gösterilecek bilgiler</div><div class="permgrid">' +
+      chk('addr', 'Adres') + chk('phone', 'Telefon') + chk('tax', 'Vergi dairesi / no') + chk('cari', 'Cari adı') + chk('user', 'İşlemi yapan kullanıcı') + chk('vat', 'KDV dökümü (KDV hariç ve oranlara göre KDV)') + chk('pays', 'Ödeme yöntemi satırları') + chk('disc', '“… indirim kazandınız” özeti (satışta)') + chk('notice', '“Bilgi fişidir, mali değeri yoktur” uyarısı') +
+    '</div></div>' +
+    '<div class="cols">' + kinds.map(function(k){ return fld(k[1] + ' fişi başlığı', '<input id="rc_t_' + k[0] + '" value="' + esc(o.titles[k[0]]) + '" placeholder="' + esc(RC_TITLES[k[0]]) + '">'); }).join('') + '</div>' +
+    '<h3 style="font-size:15px;margin:6px 0 8px">Alt not (her işlem türü için ayrı, boş bırakılabilir)</h3><div class="cols">' +
+    kinds.map(function(k){ return fld(k[1] + ' alt notu', '<textarea id="rc_f_' + k[0] + '" rows="2" placeholder="Boş">' + esc(o.foot[k[0]]) + '</textarea>'); }).join('') + '</div>' +
+    '<div class="row-end" style="justify-content:flex-start"><button class="btn pri" data-act="saveRc">Kaydet</button><button class="btn" data-act="rcReset">Varsayılana dön</button></div></div>';
+}
+A.saveRc = function(){
+  var o = {titles:{}, foot:{}};
+  document.querySelectorAll('[data-rc]').forEach(function(cb){ o[cb.dataset.rc] = cb.checked; });
+  Object.keys(RC_TITLES).forEach(function(k){
+    o.titles[k] = (($('#rc_t_' + k).value || '').trim()) || RC_TITLES[k];
+    o.foot[k] = ($('#rc_f_' + k).value || '').replace(/\s+$/, '');
+  });
+  db.settings.rc = o; commit(); toast('Fiş tasarımı kaydedildi');
+};
+A.rcReset = function(){
+  confirmBox('Fiş tasarımı varsayılana dönecek ve tüm alt notlar silinecek.', function(){ db.settings.rc = {titles:{}, foot:{}}; commit(); toast('Fiş tasarımı sıfırlandı'); }, 'Sıfırla');
+};
+
+/* ---------- Etiket tasarımı ---------- */
+var LBL_PRESETS = {
+  'a4-3x7':{mode:'a4', w:63.5, h:38.1, cols:3, gapX:2.5, gapY:0, mTop:15.15, mLeft:7.2, pad:2, nameSize:9, priceSize:13, smallSize:7, nameLines:2, bw:36, bh:13, label:'A4 sayfa – 3 × 7 (63,5 × 38,1 mm)'},
+  'a4-3x8':{mode:'a4', w:63.5, h:33.9, cols:3, gapX:2.5, gapY:0, mTop:12.9, mLeft:7.2, pad:1.5, nameSize:9, priceSize:12, smallSize:7, nameLines:2, bw:36, bh:9.5, label:'A4 sayfa – 3 × 8 (63,5 × 33,9 mm)'},
+  'a4-4x10':{mode:'a4', w:48.5, h:25.4, cols:4, gapX:0, gapY:0, mTop:21.5, mLeft:8, pad:1.5, nameSize:7, priceSize:10, smallSize:5.5, nameLines:1, bw:30, bh:7, label:'A4 sayfa – 4 × 10 (48,5 × 25,4 mm)'},
+  'a4-2x7':{mode:'a4', w:99.1, h:38.1, cols:2, gapX:2.5, gapY:0, mTop:15.15, mLeft:4.6, pad:2, nameSize:11, priceSize:15, smallSize:8, nameLines:1, bw:44, bh:11, label:'A4 sayfa – 2 × 7 (99,1 × 38,1 mm)'},
+  'roll-50x30':{mode:'roll', w:50, h:30, pad:1.5, nameSize:8, priceSize:11, smallSize:6, nameLines:2, bw:34, bh:8, label:'Rulo / termal – 50 × 30 mm'},
+  'roll-40x25':{mode:'roll', w:40, h:25, pad:1, nameSize:7, priceSize:10, smallSize:5.5, nameLines:1, bw:30, bh:6, label:'Rulo / termal – 40 × 25 mm'},
+  'roll-60x40':{mode:'roll', w:60, h:40, pad:2, nameSize:10, priceSize:14, smallSize:7.5, nameLines:2, bw:40, bh:12, label:'Rulo / termal – 60 × 40 mm'},
+  'roll-100x50':{mode:'roll', w:100, h:50, pad:3, nameSize:13, priceSize:20, smallSize:10, nameLines:2, bw:55, bh:13, label:'Rulo / termal – 100 × 50 mm'},
+  'custom':{label:'Özel ölçü'}
+};
+var LBL_DEF = {preset:'a4-3x8', mode:'a4', w:63.5, h:33.9, cols:3, gapX:2.5, gapY:0, mTop:12.9, mLeft:7.2, pad:1.5, align:'center',
+  company:false, logo:false, name:true, attrs:[false, false, false, false, false], barcode:true, digits:true, code:true, price:true,
+  nameSize:9, priceSize:12, smallSize:7, nameLines:2, bw:36, bh:9.5, border:true};
+var LBL_RANGE = {w:[15, 210], h:[10, 297], cols:[1, 8], gapX:[0, 30], gapY:[0, 30], mTop:[0, 60], mLeft:[0, 60], pad:[0, 15], nameSize:[5, 40], priceSize:[5, 48], smallSize:[4, 24], nameLines:[1, 4], bw:[15, 120], bh:[4, 40]};
+function lbClamp(o){
+  Object.keys(LBL_RANGE).forEach(function(k){ var v = parseFloat(String(o[k]).replace(',', '.')); if(!isFinite(v)) v = LBL_DEF[k]; o[k] = Math.round(Math.min(LBL_RANGE[k][1], Math.max(LBL_RANGE[k][0], v)) * 100) / 100; });
+  o.cols = Math.round(o.cols); o.nameLines = Math.round(o.nameLines);
+  o.mode = o.mode === 'roll' ? 'roll' : 'a4'; o.align = o.align === 'left' ? 'left' : 'center';
+  return o;
+}
+function lblOpt(){
+  var r = (db.settings && db.settings.lbl) || {}, o = JSON.parse(JSON.stringify(LBL_DEF));
+  Object.keys(LBL_DEF).forEach(function(k){
+    if(k === 'attrs'){ if(Array.isArray(r.attrs)) o.attrs = [0, 1, 2, 3, 4].map(function(i){ return !!r.attrs[i]; }); }
+    else if(r[k] !== undefined && typeof r[k] === typeof LBL_DEF[k]) o[k] = r[k];
+  });
+  if(!LBL_PRESETS[o.preset]) o.preset = 'custom';
+  return lbClamp(o);
+}
+function lblSummary(o){ return qf(o.w) + ' × ' + qf(o.h) + ' mm · ' + (o.mode === 'a4' ? 'A4 sayfa, ' + o.cols + ' sütun' : 'rulo / termal, her etiket ayrı sayfa'); }
+function lblCss(o){
+  var a4 = o.mode === 'a4';
+  return '.lbls2{display:grid;grid-template-columns:repeat(' + (a4 ? o.cols : 1) + ',' + o.w + 'mm);column-gap:' + (a4 ? o.gapX : 0) + 'mm;row-gap:' + (a4 ? o.gapY : 0) + 'mm;justify-content:start;align-content:start}' +
+    '.lbl2{box-sizing:border-box;width:' + o.w + 'mm;height:' + o.h + 'mm;padding:' + o.pad + 'mm;overflow:hidden;background:#fff;color:#000;font-family:system-ui,Arial,sans-serif;display:flex;flex-direction:column;align-items:' + (o.align === 'left' ? 'flex-start' : 'center') + ';justify-content:center;text-align:' + o.align + ';line-height:1.15;break-inside:avoid;page-break-inside:avoid' + (o.border ? ';border:0.2mm dashed #999' : '') + '}' +
+    '.lbl2>*{flex:none}' +
+    '.lbl2 .l-co,.lbl2 .l-at,.lbl2 .l-cd{font-size:' + o.smallSize + 'pt;color:#333;max-width:100%}' +
+    '.lbl2 .l-lg{max-height:7mm;max-width:100%;object-fit:contain}' +
+    '.lbl2 .l-nm{font-size:' + o.nameSize + 'pt;font-weight:700;max-width:100%;display:-webkit-box;-webkit-line-clamp:' + o.nameLines + ';-webkit-box-orient:vertical;overflow:hidden;word-break:break-word}' +
+    '.lbl2 .l-bc{max-width:100%;line-height:0;margin:0.6mm 0}' +
+    '.lbl2 .l-bc svg{max-width:100%}' +
+    '.lbl2 .l-pr{font-size:' + o.priceSize + 'pt;font-weight:700}';
+}
+function lblPage(o){
+  return o.mode === 'a4'
+    ? '@page{size:A4;margin:' + o.mTop + 'mm ' + o.mLeft + 'mm}'
+    : '@page{size:' + o.w + 'mm ' + o.h + 'mm;margin:0}@media print{.lbls2 .lbl2{page-break-after:always;break-after:page}.lbls2 .lbl2:last-child{page-break-after:auto;break-after:auto}}';
+}
+function applyLblCss(o){
+  var st = document.getElementById('lblstyle2');
+  if(!st){ st = document.createElement('style'); st.id = 'lblstyle2'; document.head.appendChild(st); }
+  st.textContent = lblCss(o);
+}
+function labelHTML(p, o){
+  var st = db.settings || {}, h = '<div class="lbl2">';
+  if(o.logo && logoSrc()) h += '<img class="l-lg" src="' + logoSrc() + '" alt="">';
+  if(o.company && st.name) h += '<div class="l-co">' + esc(st.name) + '</div>';
+  if(o.name) h += '<div class="l-nm">' + esc(p.name) + '</div>';
+  var parts = [];
+  o.attrs.forEach(function(on, i){ if(on && p.attrs && p.attrs[i]) parts.push(attrLabel(i, p.attrs[i])); });
+  if(parts.length) h += '<div class="l-at">' + esc(parts.join(' · ')) + '</div>';
+  if(o.barcode && p.barcode){
+    var sv = ean13Svg(p.barcode, {digits:o.digits, wmm:Math.min(o.bw, Math.max(10, o.w - 2 * o.pad)), hmm:o.bh});
+    h += '<div class="l-bc">' + (sv || '<b style="font-size:' + o.smallSize + 'pt;line-height:1.2">' + esc(p.barcode) + '</b>') + '</div>';
+  }
+  if(o.code && p.code) h += '<div class="l-cd">' + esc(p.code) + '</div>';
+  if(o.price) h += '<div class="l-pr">' + money(p.price) + '</div>';
+  return h + '</div>';
+}
+function lbWarn(){
+  var pv = $('#lblprev'), el = pv && pv.querySelector('.lbl2'); if(!el) return;
+  var old = pv.querySelector('.lbwarn'); if(old) old.remove();
+  if(el.scrollHeight > el.clientHeight + 1 || el.scrollWidth > el.clientWidth + 1){
+    var d = document.createElement('div'); d.className = 'neg lbwarn'; d.style.cssText = 'font-size:13px;margin-top:4px';
+    d.textContent = 'İçerik etikete sığmıyor, bir kısmı kesilecek. Yazı boyutlarını, barkod yüksekliğini veya iç boşluğu küçültün ya da bazı bilgileri kapatın.';
+    pv.appendChild(d);
+  }
+}
+function sampleProd(){
+  var p = db.products.find(function(x){ return x.barcode; });
+  return p || {name:'Örnek Ürün Adı 500 g', code:'ORN-001', barcode:'2900000000018', price:249.9, attrs:['', '', '', '', '']};
+}
+function lbPreviewHTML(o){
+  var rows = Math.max(1, Math.floor((297 - 2 * o.mTop + o.gapY) / (o.h + o.gapY) + 0.02));
+  var info = o.mode === 'a4'
+    ? 'A4 sayfada yaklaşık ' + o.cols + ' sütun × ' + rows + ' satır = ' + (o.cols * rows) + ' etiket'
+    : 'Rulo / termal: her etiket ayrı bir sayfa olarak yazdırılır';
+  var warn = (o.mode === 'a4' && (o.cols * o.w + (o.cols - 1) * o.gapX + 2 * o.mLeft > 210.5)) ? '<div class="neg" style="font-size:13px;margin-top:4px">Etiketler sayfa genişliğine (210 mm) sığmıyor. Sütun sayısını, etiket genişliğini veya kenar boşluğunu azaltın.</div>' : '';
+  return '<div class="lbls2">' + labelHTML(sampleProd(), o) + '</div><div class="muted" style="font-size:12px;margin-top:6px">Önizleme gerçek ölçüdedir (ekran çözünürlüğüne göre küçük sapabilir). ' + esc(info) + '.</div>' + warn;
+}
+function lblCard(){
+  var o = lblOpt(), names = attrNames();
+  applyLblCss(o);
+  var nf = function(k, label, step){ return fld(label, '<input type="number" inputmode="decimal" step="' + step + '" min="' + LBL_RANGE[k][0] + '" max="' + LBL_RANGE[k][1] + '" data-lb="' + k + '" value="' + o[k] + '">'); };
+  var ck = function(k, label, on){ return '<label class="chk pk"><input type="checkbox" data-lb="' + k + '"' + (on ? ' checked' : '') + '> ' + label + '</label>'; };
+  return '<div class="card"><h3>Etiket tasarımı</h3><p class="muted" style="margin-top:0">Etiketin ölçüsünü, hangi bilgilerin basılacağını ve yazı boyutlarını ayarlayın. Değişiklikler önizlemede anında görünür, Kaydet’e basınca etiket yazdırma ekranlarında kullanılır. Hazır ölçüler yaygın etiket kâğıtlarına göre yaklaşıktır, ilk kullanımda “Test etiketi yazdır” ile kontrol edin.</p>' +
+    '<div class="cols">' +
+      fld('Hazır ölçü', '<select data-lb="preset">' + Object.keys(LBL_PRESETS).map(function(k){ return '<option value="' + k + '"' + (o.preset === k ? ' selected' : '') + '>' + esc(LBL_PRESETS[k].label) + '</option>'; }).join('') + '</select>') +
+      fld('Yazdırma türü', '<select data-lb="mode"><option value="a4"' + (o.mode === 'a4' ? ' selected' : '') + '>A4 etiket sayfası (ızgara)</option><option value="roll"' + (o.mode === 'roll' ? ' selected' : '') + '>Rulo / termal (her etiket ayrı sayfa)</option></select>') +
+    '</div>' +
+    '<div class="cols3">' + nf('w', 'Etiket genişliği (mm)', '0.1') + nf('h', 'Etiket yüksekliği (mm)', '0.1') + nf('pad', 'İç boşluk (mm)', '0.5') + '</div>' +
+    '<div class="cols3">' + nf('cols', 'Sütun sayısı (A4)', '1') + nf('gapX', 'Yatay aralık (mm, A4)', '0.1') + nf('gapY', 'Dikey aralık (mm, A4)', '0.1') + '</div>' +
+    '<div class="cols3">' + nf('mTop', 'Sayfa üst boşluğu (mm, A4)', '0.1') + nf('mLeft', 'Sayfa sol boşluğu (mm, A4)', '0.1') + fld('Hizalama', '<select data-lb="align"><option value="center"' + (o.align === 'center' ? ' selected' : '') + '>Ortalı</option><option value="left"' + (o.align === 'left' ? ' selected' : '') + '>Sola yaslı</option></select>') + '</div>' +
+    '<div class="cols3">' + nf('nameSize', 'Ürün adı yazı boyutu (pt)', '0.5') + nf('priceSize', 'Fiyat yazı boyutu (pt)', '0.5') + nf('smallSize', 'Diğer yazılar (pt)', '0.5') + '</div>' +
+    '<div class="cols3">' + nf('nameLines', 'Ürün adı en çok satır', '1') + nf('bw', 'Barkod genişliği (mm)', '0.5') + nf('bh', 'Barkod çizgi yüksekliği (mm)', '0.5') + '</div>' +
+    '<div class="pgrp" style="margin-bottom:12px"><div class="pgt">Etikette basılacak bilgiler</div><div class="permgrid">' +
+      ck('name', 'Ürün adı', o.name) + ck('barcode', 'Barkod (çizgiler)', o.barcode) + ck('digits', 'Barkod numarası (rakamlar)', o.digits) + ck('code', 'Ürün kodu', o.code) + ck('price', 'Fiyat', o.price) + ck('company', 'Firma adı', o.company) + ck('logo', 'Firma logosu', o.logo) + ck('border', 'Kesme çizgisi (kesikli çerçeve)', o.border) +
+      names.map(function(n, i){ return n ? ck('attr' + i, esc(n) + ' (özellik)', o.attrs[i]) : ''; }).join('') +
+    '</div></div>' +
+    '<div class="pgt" style="margin-bottom:6px">Önizleme</div><div id="lblprev" class="lblbox" style="overflow:auto;padding:12px;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;margin-bottom:12px">' + lbPreviewHTML(o) + '</div>' +
+    '<div class="row-end" style="justify-content:flex-start"><button class="btn pri" data-act="saveLbl">Kaydet</button><button class="btn" data-act="lblTest">Test etiketi yazdır</button><button class="btn" data-act="lblReset">Varsayılana dön</button></div></div>';
+}
+function lbRead(){
+  var o = JSON.parse(JSON.stringify(LBL_DEF)); o.attrs = [false, false, false, false, false];
+  document.querySelectorAll('[data-lb]').forEach(function(el){
+    var k = el.dataset.lb;
+    if(/^attr\d$/.test(k)) o.attrs[+k.slice(4)] = el.checked;
+    else if(el.type === 'checkbox') o[k] = el.checked;
+    else if(typeof LBL_DEF[k] === 'number') o[k] = el.value === '' ? LBL_DEF[k] : num(el.value);
+    else o[k] = el.value;
+  });
+  return lbClamp(o);
+}
+function lbChange(t){
+  var k = t.dataset.lb, geo = ['mode', 'w', 'h', 'cols', 'gapX', 'gapY', 'mTop', 'mLeft'];
+  if(k === 'preset'){
+    var pr = LBL_PRESETS[t.value];
+    if(pr && t.value !== 'custom') geo.concat(['pad', 'nameSize', 'priceSize', 'smallSize', 'nameLines', 'bw', 'bh']).forEach(function(g){ if(pr[g] !== undefined){ var el = document.querySelector('[data-lb="' + g + '"]'); if(el) el.value = pr[g]; } });
+  } else if(geo.indexOf(k) >= 0){
+    var ps = document.querySelector('[data-lb="preset"]'); if(ps) ps.value = 'custom';
+  }
+  var o = lbRead(); applyLblCss(o);
+  var pv = $('#lblprev'); if(pv){ pv.innerHTML = lbPreviewHTML(o); lbWarn(); }
+}
+A.saveLbl = function(){ db.settings.lbl = lbRead(); commit(); toast('Etiket tasarımı kaydedildi'); };
+A.lblReset = function(){ confirmBox('Etiket tasarımı varsayılana dönecek.', function(){ db.settings.lbl = null; commit(); toast('Etiket tasarımı sıfırlandı'); }, 'Sıfırla'); };
+A.lblTest = function(){
+  var o = lbRead(), rows = 3, n = o.mode === 'a4' ? o.cols * rows : 2;
+  showLabels([{p:sampleProd(), n:n}], null, null, o);
+};
+
 /* ---------- Toplu barkod atama ---------- */
 var lastBulk = [];
 function bbFilter(){
@@ -1983,9 +2325,9 @@ A.batchLabels = function(){
   }).join('');
   modal('Toplu etiket',
     (noBc ? '<div class="hint">' + noBc + ' ürünün barkodu yok, etiketi basılamaz. <button type="button" class="btn sm" data-act="autoBarcodes">Otomatik EAN-13 ata</button></div>' : '') +
-    '<div class="cols">' + fld('Ara', '<input id="lblq" placeholder="Ad, kod, barkod veya özellik" autocomplete="off">') + fld('Sayfa düzeni', '<select name="layout"><option value="a4">A4 sayfa (3 sütun)</option><option value="th">Termal etiket (tek sütun)</option></select>') + '</div>' +
+    '<div class="cols">' + fld('Ara', '<input id="lblq" placeholder="Ad, kod, barkod veya özellik" autocomplete="off">') + fld('Etiket tasarımı', '<div class="muted" style="padding-top:10px;font-size:13px">' + esc(lblSummary(lblOpt())) + (can('settings.edit') ? ' · değiştirmek için Ayarlar, Etiket tasarımı' : '') + '</div>') + '</div>' +
     (filt ? '<div class="chips" style="margin-bottom:8px">' + filt + '</div>' : '') +
-    '<div class="chips" style="margin-bottom:8px;align-items:center"><button type="button" class="btn sm" data-act="lblAll" data-v="1">Görünenleri seç</button><button type="button" class="btn sm" data-act="lblAll" data-v="0">Seçimi temizle</button><button type="button" class="btn sm" data-act="lblStock">Adet = stok</button><label class="chk"><input type="checkbox" name="showPrice" checked> Fiyat</label><label class="chk"><input type="checkbox" name="showCode" checked> Ürün kodu</label></div>' +
+    '<div class="chips" style="margin-bottom:8px;align-items:center"><button type="button" class="btn sm" data-act="lblAll" data-v="1">Görünenleri seç</button><button type="button" class="btn sm" data-act="lblAll" data-v="0">Seçimi temizle</button><button type="button" class="btn sm" data-act="lblStock">Adet = stok</button><label class="chk"><input type="checkbox" name="showPrice"' + (lblOpt().price ? ' checked' : '') + '> Fiyat</label><label class="chk"><input type="checkbox" name="showCode"' + (lblOpt().code ? ' checked' : '') + '> Ürün kodu</label></div>' +
     '<div class="tbl" style="max-height:320px;overflow:auto"><table><thead><tr><th></th><th>Ürün</th><th>Barkod</th><th class="r">Adet</th></tr></thead><tbody>' + rows + '</tbody></table></div>',
     function(f){
       var items = [], total = 0;
@@ -1997,21 +2339,25 @@ A.batchLabels = function(){
       });
       if(!items.length){ toast('Etiket için en az bir ürün seçin', 'err'); return false; }
       if(total > 600){ toast('Tek seferde en fazla 600 etiket oluşturulabilir', 'err'); return false; }
-      var lay = f.layout, pr = !!f.showPrice, cd = !!f.showCode;
-      setTimeout(function(){ showLabels(items, lay, pr, cd); }, 0);
+      var pr = !!f.showPrice, cd = !!f.showCode;
+      setTimeout(function(){ showLabels(items, pr, cd); }, 0);
     }, 'Etiketleri oluştur', null, true);
 };
-function showLabels(items, layout, price, code){
-  var total = 0, h = '<div class="lbls' + (layout === 'th' ? ' th' : '') + '">';
+function showLabels(items, price, code, oo){
+  var o = oo || lblOpt();
+  if(price !== null && price !== undefined) o.price = price;
+  if(code !== null && code !== undefined) o.code = code;
+  applyLblCss(o);
+  var total = 0, h = '<div class="lbls2">';
   items.forEach(function(it){
-    var p = it.p, svg = ean13Svg(p.barcode);
-    var one = '<div class="lbl"><div class="ln">' + esc(p.name) + '</div>' + (svg || '<div class="lc"><b>' + esc(p.barcode) + '</b></div>') + (code && p.code ? '<div class="lc">' + esc(p.code) + '</div>' : '') + (price ? '<div class="lp">' + money(p.price) + '</div>' : '') + '</div>';
+    var one = labelHTML(it.p, o);
     for(var n = 0; n < it.n; n++) h += one;
     total += it.n;
   });
   h += '</div>';
-  lastRcpt = {html:h, name:'etiketler-' + today(), page:layout === 'th' ? 'labelth' : 'a4', css:LBLCSS};
-  modal('Etiketler (' + total + ' adet)', '<div class="lblbox" style="max-height:55vh;overflow:auto;border:1px solid var(--border);border-radius:8px;padding:8px;background:var(--surface-2)">' + h + '</div>', null, null,
+  lastRcpt = {html:h, name:'etiketler-' + today(), pageCss:lblPage(o), css:lblCss(o) + lblPage(o)};
+  modal('Etiketler (' + total + ' adet)', '<div class="lblbox" style="max-height:55vh;overflow:auto;border:1px solid var(--border);border-radius:8px;padding:8px;background:var(--surface-2)">' + h + '</div>' +
+    '<div class="muted noprint" style="font-size:12px;margin-top:6px">' + esc(lblSummary(o)) + '. Yazdırma penceresinde ölçeği %100 seçin, “sayfaya sığdır” ve üstbilgi/altbilgi seçeneklerini kapatın.' + (o.mode === 'roll' ? ' Kâğıt boyutu olarak etiket boyutunu seçin.' : '') + '</div>', null, null,
     '<button type="button" class="btn" data-act="batchLabels">Geri</button><button type="button" class="btn" data-act="saveRcpt">Dosya olarak kaydet</button><button type="button" class="btn pri" data-act="printRcpt">Yazdır</button>', true);
 }
 A.lblAll = function(d){
@@ -2042,34 +2388,48 @@ A.switchDoc = function(d){
   if(d.from === d.to) return;
   if(DOC_PERM[d.to] && !can(DOC_PERM[d.to])){ toast('Bu işlem için yetkiniz yok', 'err'); return; }
   var ed = state.ed[d.from]; if(!ed) return;
-  state.ed[d.from] = null; state.ed[d.to] = ed; render();
+  ed.ref = ''; if(ed.pm === 'ref') ed.pm = 'n'; state.ed[d.from] = null; state.ed[d.to] = ed; render();
 };
 A.repMethod = function(d){ state.rep.method = d.m; render(); };
 A.copyPay = function(){
   var list = payMoves().filter(function(m){ return !state.rep.method || m.method === state.rep.method; });
-  var txt = ['Tarih', 'Kaynak', 'Cari', 'Yöntem', 'Yön', 'Kullanıcı', 'Tutar'].join('\t') + '\n' + list.map(function(m){ return [fd(m.date), m.src, cariName(m.who), m.method, m.dir === 'in' ? 'Giriş' : 'Çıkış', userName(m.by), m.amt].join('\t'); }).join('\n');
+  var txt = ['Tarih', 'Kaynak', 'Cari', 'Yöntem', 'Yön', 'Kullanıcı', 'Tutar'].join('\t') + '\n' + list.map(function(m){ return [fd(m.date), m.src, m.whoName, m.method, m.dir === 'in' ? 'Giriş' : 'Çıkış', userName(m.by), m.amt].join('\t'); }).join('\n');
   try{ navigator.clipboard.writeText(txt); }catch(e){}
   modal('Kasa hareketleri', '<p class="muted" style="margin-top:0">Metin panoya kopyalandı. Kopyalanmadıysa aşağıdan seçip kopyalayın. Excel veya Sheets içine yapıştırabilirsiniz.</p><textarea rows="8" onfocus="this.select()">' + esc(txt) + '</textarea>', null);
 };
 
 /* ---------- Fiş / makbuz ---------- */
+var RC_TITLES = {sale:'Satış fişi', purchase:'Alış fişi', sret:'Satış iadesi fişi', pret:'Alış iadesi fişi', 'in':'Tahsilat makbuzu', out:'Ödeme makbuzu'};
+function rcOpt(){
+  var st = db.settings || {}, r = st.rc || {};
+  var o = {addr:true, phone:true, tax:true, cari:true, user:true, vat:true, pays:true, disc:true, notice:true, titles:{}, foot:{}};
+  ['addr', 'phone', 'tax', 'cari', 'user', 'vat', 'pays', 'disc', 'notice'].forEach(function(k){ if(typeof r[k] === 'boolean') o[k] = r[k]; });
+  Object.keys(RC_TITLES).forEach(function(k){
+    o.titles[k] = (r.titles && r.titles[k]) ? r.titles[k] : RC_TITLES[k];
+    o.foot[k] = (r.foot && typeof r.foot[k] === 'string') ? r.foot[k] : ((!r.foot && k === 'sale') ? (st.footer || '') : '');
+  });
+  return o;
+}
 function rcptHead(title, no, date){
-  var st = db.settings || {};
+  var st = db.settings || {}, rc = rcOpt();
   var h = '<div class="rcpt">' + (st.logoRcpt && logoSrc() ? '<div class="c"><img src="' + logoSrc() + '" alt="" style="max-width:70%;max-height:48px"></div>' : '') + '<h4>' + esc(st.name || 'İşletme') + '</h4>';
-  if(st.address) h += '<div class="c">' + esc(st.address) + '</div>';
-  if(st.phone) h += '<div class="c">Tel: ' + esc(st.phone) + '</div>';
-  if(st.taxNo) h += '<div class="c">' + esc(st.taxNo) + '</div>';
+  if(rc.addr && st.address) h += '<div class="c">' + esc(st.address) + '</div>';
+  if(rc.phone && st.phone) h += '<div class="c">Tel: ' + esc(st.phone) + '</div>';
+  if(rc.tax && st.taxNo) h += '<div class="c">' + esc(st.taxNo) + '</div>';
   return h + '<hr><div class="rr"><span>' + esc(title) + '</span><span>' + esc(no) + '</span></div><div class="rr"><span>Tarih</span><span>' + fd(date) + '</span></div>';
 }
-function rcptFoot(){
-  var st = db.settings || {};
-  return '<hr><div class="c">' + esc(st.footer || 'Teşekkür ederiz') + '</div><div class="c" style="margin-top:6px;font-size:11px">Bilgi fişidir, mali değeri yoktur.</div></div>';
+function rcptFoot(kind){
+  var rc = rcOpt(), ft = String(rc.foot[kind] || '').trim(), parts = '';
+  if(ft) parts += '<div class="c">' + esc(ft).replace(/\n/g, '<br>') + '</div>';
+  if(rc.notice) parts += '<div class="c" style="margin-top:6px;font-size:11px">Bilgi fişidir, mali değeri yoktur.</div>';
+  return (parts ? '<hr>' + parts : '') + '</div>';
 }
 function rcptDoc(x){
-  var vs = vatSplit(x.lines), rest = r2(x.total - x.paid), T = TYPES[x.type], pp = docPays(x);
-  var h = rcptHead(KIND[x.type] + ' fişi', x.no, x.date);
-  if(x.cariId) h += '<div class="rr"><span>Cari</span><span>' + esc(cariName(x.cariId)) + '</span></div>';
-  if(x.by) h += '<div class="rr"><span>Kullanıcı</span><span>' + esc(userName(x.by)) + '</span></div>';
+  var vs = vatSplit(x.lines), rest = r2(x.total - x.paid), T = TYPES[x.type], pp = docPays(x), rc = rcOpt();
+  var h = rcptHead(rc.titles[x.type], x.no, x.date);
+  if(x.refNo) h += '<div class="rr"><span>Bağlı belge</span><span>' + esc(x.refNo) + '</span></div>';
+  if(x.cariId && rc.cari) h += '<div class="rr"><span>Cari</span><span>' + esc(cariName(x.cariId)) + '</span></div>';
+  if(x.by && rc.user) h += '<div class="rr"><span>Kullanıcı</span><span>' + esc(userName(x.by)) + '</span></div>';
   h += '<hr>';
   var gSum = 0, cSum = 0, mSum = 0, dSum = 0;
   x.lines.forEach(function(l){
@@ -2088,24 +2448,27 @@ function rcptDoc(x){
     if(dSum > 0.004) h += '<div class="rr"><span>Genel iskonto' + (x.docDisc && x.docDisc.t === '%' ? ' %' + qf(x.docDisc.v) : '') + '</span><span>−' + money(r2(dSum)) + '</span></div>';
     h += '<div class="rr"><span>Toplam indirim</span><span>−' + money(disc) + '</span></div><hr>';
   }
-  h += '<div class="rr"><span>KDV hariç</span><span>' + money(vs.net) + '</span></div>';
-  Object.keys(vs.by).sort(function(a, b){ return a - b; }).forEach(function(r){ h += '<div class="rr"><span>KDV %' + r + '</span><span>' + money(vs.by[r].vat) + '</span></div>'; });
+  if(rc.vat){
+    h += '<div class="rr"><span>KDV hariç</span><span>' + money(vs.net) + '</span></div>';
+    Object.keys(vs.by).sort(function(a, b){ return a - b; }).forEach(function(r){ h += '<div class="rr"><span>KDV %' + r + '</span><span>' + money(vs.by[r].vat) + '</span></div>'; });
+  }
   h += '<div class="rr b"><span>TOPLAM</span><span>' + money(x.total) + '</span></div>';
   h += '<div class="rr"><span>' + T.paidLabel + '</span><span>' + money(x.paid) + '</span></div>';
-  Object.keys(pp).forEach(function(m){ h += '<div class="rr"><span>&nbsp;&nbsp;' + esc(m) + '</span><span>' + money(pp[m]) + '</span></div>'; });
+  if(rc.pays) Object.keys(pp).forEach(function(m){ h += '<div class="rr"><span>&nbsp;&nbsp;' + esc(m) + '</span><span>' + money(pp[m]) + '</span></div>'; });
   if(rest > 0.004) h += '<div class="rr"><span>' + (x.type === 'sale' ? 'Kalan (veresiye)' : 'Kalan (cari hesaba)') + '</span><span>' + money(rest) + '</span></div>';
-  if(disc > 0.004 && x.type === 'sale') h += '<div class="c" style="margin-top:4px">Bu alışverişte ' + money(disc) + ' indirim kazandınız.</div>';
+  if(rc.disc && disc > 0.004 && x.type === 'sale') h += '<div class="c" style="margin-top:4px">Bu alışverişte ' + money(disc) + ' indirim kazandınız.</div>';
   if(x.note) h += '<div>' + esc(x.note) + '</div>';
-  return h + rcptFoot();
+  return h + rcptFoot(x.type);
 }
 function rcptPay(p){
-  var h = rcptHead(p.dir === 'in' ? 'Tahsilat makbuzu' : 'Ödeme makbuzu', '', p.date);
-  h += '<div class="rr"><span>Cari</span><span>' + esc(cariName(p.cariId)) + '</span></div>';
+  var rc = rcOpt();
+  var h = rcptHead(rc.titles[p.dir], '', p.date);
+  if(p.cariId && rc.cari) h += '<div class="rr"><span>Cari</span><span>' + esc(cariName(p.cariId)) + '</span></div>';
   h += '<div class="rr"><span>Yöntem</span><span>' + esc(p.method) + '</span></div>';
-  if(p.by) h += '<div class="rr"><span>Kullanıcı</span><span>' + esc(userName(p.by)) + '</span></div>';
+  if(p.by && rc.user) h += '<div class="rr"><span>Kullanıcı</span><span>' + esc(userName(p.by)) + '</span></div>';
   h += '<hr><div class="rr b"><span>TUTAR</span><span>' + money(p.amount) + '</span></div>';
   if(p.note) h += '<div>' + esc(p.note) + '</div>';
-  return h + rcptFoot();
+  return h + rcptFoot(p.dir);
 }
 var lastRcpt = null;
 A.receipt = function(d){
@@ -2126,7 +2489,7 @@ A.printRcpt = function(){
   var pg = document.getElementById('pgstyle');
   if(!pg){ pg = document.createElement('style'); pg.id = 'pgstyle'; document.head.appendChild(pg); }
   var kind = lastRcpt && lastRcpt.page;
-  pg.textContent = kind === 'a4' ? '@page{size:A4;margin:8mm}' : kind === 'labelth' ? '@page{size:auto;margin:2mm}' : '@page{size:80mm auto;margin:3mm}';
+  pg.textContent = (lastRcpt && lastRcpt.pageCss) ? lastRcpt.pageCss : kind === 'a4' ? '@page{size:A4;margin:8mm}' : kind === 'labelth' ? '@page{size:auto;margin:2mm}' : '@page{size:80mm auto;margin:3mm}';
   try{ window.print(); }catch(e){ toast('Yazdırma bu görünümde açılamadı. Dosya olarak kaydedip açın.', 'err'); }
 };
 async function saveFile(name, data){
