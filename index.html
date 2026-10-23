@@ -181,6 +181,9 @@ label.f>input,label.f>select,label.f>textarea{margin-top:4px;font-weight:400}
 .pickbar input{flex:1 1 100%;min-width:0}
 .cpbox{max-height:320px;overflow:auto;margin-top:6px}
 .cpi{width:110px;text-align:right}
+@media(max-width:640px){.cpbox table{font-size:13px;min-width:0}.cpbox th,.cpbox td{padding:6px 5px}.cpi{width:78px;padding:6px 7px}}
+.cpdet{margin:4px 0 10px}
+.cpdet summary{cursor:pointer;font-weight:600;font-size:13px;padding:6px 0}
 .chk input{width:auto;min-height:0}
 #usr{margin-left:auto}
 .usr{font:inherit;font-weight:600;border:1px solid var(--border);background:var(--surface-2);color:var(--text);border-radius:99px;padding:5px 12px;cursor:pointer}
@@ -219,7 +222,7 @@ label.f>input,label.f>select,label.f>textarea{margin-top:4px;font-weight:400}
 <script>
 /* ---------- Veri ---------- */
 var KEY = 'stokcari_v1';
-var APP_VERSION = '2026.10.24-1';
+var APP_VERSION = '2026.10.24-2';
 function defaults(){ return {products:[],caris:[],docs:[],payments:[],moves:[],counters:{sale:0,purchase:0},seq:1,users:[],campaigns:[],settings:{name:'',phone:'',address:'',taxNo:'',footer:'',logo:'',logoRcpt:false,attrVals:[[],[],[],[],[]]}}; }
 function load(){
   try{ var s = localStorage.getItem(KEY); if(s){ var o = JSON.parse(s); return Object.assign(defaults(), o); } }catch(e){}
@@ -1096,32 +1099,39 @@ function priceSummary(c){
   var n = c.prices ? Object.keys(c.prices).length : 0;
   return (c.ptype === 'wholesale' ? 'Toptan' : 'Perakende') + (n ? ' · ' + n + ' özel fiyat' : '');
 }
+document.addEventListener('keydown', function(e){ if(e.key === 'Enter' && e.target && e.target.matches && e.target.matches('[data-cf],[data-cpf]')) e.preventDefault(); });
 function cpFilter(q){
   q = nz(q);
   document.querySelectorAll('#cprows tr').forEach(function(r){ r.style.display = !q || r.dataset.t.indexOf(q) >= 0 ? '' : 'none'; });
 }
-function cariPriceForm(id){
-  var c = cari(id); if(!c) return;
-  var list = db.products.slice().sort(function(a, b){ return a.name.localeCompare(b.name, 'tr'); }), pr = c.prices || {};
-  modal('Fiyat tanımları · ' + c.name,
-    '<div class="hint">Bu cariye satış yaparken fiyat şu sırayla belirlenir: önce aşağıda girilen <b>özel fiyat</b>; yoksa seçilen <b>fiyat türü</b> (toptan fiyatı olmayan ürünlerde perakende); hiçbiri yoksa <b>perakende fiyat</b>. Satış ekranında satır fiyatını elle değiştirebilirsiniz.</div>' +
-    fld('Fiyat türü', '<select name="ptype"><option value="retail"' + (c.ptype !== 'wholesale' ? ' selected' : '') + '>Perakende</option><option value="wholesale"' + (c.ptype === 'wholesale' ? ' selected' : '') + '>Toptan</option></select>') +
-    '<div class="pickbar"><input type="search" data-cpf="1" placeholder="Ürün ara (ad, kod veya barkod)" autocomplete="off"><button type="button" class="btn sm" data-act="cpClear">Özel fiyatların hepsini temizle</button></div>' +
+/* Cari kartındaki fiyat alanları: hem "Yeni cari / Düzenle" formunda (compact) hem "Fiyat tanımları" ekranında kullanılır */
+function cpFields(c, compact){
+  var list = db.products.slice().sort(function(a, b){ return a.name.localeCompare(b.name, 'tr'); }), pr = c.prices || {}, n = Object.keys(pr).length;
+  var sel = fld('Fiyat türü', '<select name="ptype"><option value="retail"' + (c.ptype !== 'wholesale' ? ' selected' : '') + '>Perakende</option><option value="wholesale"' + (c.ptype === 'wholesale' ? ' selected' : '') + '>Toptan</option></select>');
+  var table = '<div class="pickbar"><input type="search" data-cpf="1" placeholder="Ürün ara (ad, kod veya barkod)" autocomplete="off"><button type="button" class="btn sm" data-act="cpClear">Özel fiyatların hepsini temizle</button></div>' +
     '<div class="tbl cpbox"><table><thead><tr><th>Ürün</th><th class="r">Perakende</th><th class="r">Toptan</th><th class="r">Bu cariye özel</th></tr></thead><tbody id="cprows">' +
     (list.length ? list.map(function(p){
       return '<tr data-t="' + esc(nz(p.name + ' ' + (p.code || '') + ' ' + (p.barcode || ''))) + '"><td>' + esc(p.name) + (p.code ? '<div class="muted" style="font-size:12px">' + esc(p.code) + '</div>' : '') + '</td><td class="r">' + money(p.price) + '</td><td class="r">' + (p.wprice > 0 ? money(p.wprice) : '<span class="muted">—</span>') + '</td>' +
         '<td class="r"><input class="cpi" name="cp:' + esc(p.id) + '" type="number" inputmode="decimal" step="any" min="0" placeholder="—" value="' + (pr[p.id] != null ? esc(pr[p.id]) : '') + '"></td></tr>';
-    }).join('') : '<tr><td colspan="4" class="muted">Henüz ürün yok.</td></tr>') + '</tbody></table></div>',
-    function(f){
-      var np = {};
-      Object.keys(f).forEach(function(k){
-        if(k.indexOf('cp:') !== 0 || String(f[k]).trim() === '') return;
-        var v = num(f[k]); if(v > 0) np[k.slice(3)] = Math.round(v * 10000) / 10000;
-      });
-      if(f.ptype === 'wholesale') c.ptype = 'wholesale'; else delete c.ptype;
-      if(Object.keys(np).length) c.prices = np; else delete c.prices;
-      commit(); toast('Fiyat tanımları kaydedildi');
-    });
+    }).join('') : '<tr><td colspan="4" class="muted">Henüz ürün yok.</td></tr>') + '</tbody></table></div>';
+  if(!compact) return sel + table;
+  return sel + '<div class="muted" style="font-size:12px;margin:-4px 0 8px">Satışta fiyat sırası: ürüne özel fiyat, sonra fiyat türü, hiçbiri yoksa perakende.</div>' +
+    '<details class="cpdet"' + (n ? ' open' : '') + '><summary>Ürüne özel fiyatlar (isteğe bağlı)' + (n ? ' · ' + n + ' tanımlı' : '') + '</summary>' + table + '</details>';
+}
+function cpApply(c, f){                                       // formdaki fiyat türü ve özel fiyatları cariye yazar; boşsa alanlar hiç oluşmaz
+  var np = {};
+  Object.keys(f).forEach(function(k){
+    if(k.indexOf('cp:') !== 0 || String(f[k]).trim() === '') return;
+    var v = num(f[k]); if(v > 0) np[k.slice(3)] = Math.round(v * 10000) / 10000;
+  });
+  if(f.ptype === 'wholesale') c.ptype = 'wholesale'; else delete c.ptype;
+  if(Object.keys(np).length) c.prices = np; else delete c.prices;
+}
+function cariPriceForm(id){
+  var c = cari(id); if(!c) return;
+  modal('Fiyat tanımları · ' + c.name,
+    '<div class="hint">Bu cariye satış yaparken fiyat şu sırayla belirlenir: önce aşağıda girilen <b>özel fiyat</b>; yoksa seçilen <b>fiyat türü</b> (toptan fiyatı olmayan ürünlerde perakende); hiçbiri yoksa <b>perakende fiyat</b>. Satış ekranında satır fiyatını elle değiştirebilirsiniz.</div>' + cpFields(c, false),
+    function(f){ cpApply(c, f); commit(); toast('Fiyat tanımları kaydedildi'); });
 }
 function cariForm(id, after){
   var c = id ? cari(id) : null;
@@ -1133,12 +1143,14 @@ function cariForm(id, after){
       fld('Telefon', '<input name="phone" value="' + esc(c ? c.phone : '') + '">') +
       fld('Devir bakiyesi (₺)', '<input name="open" type="number" step="any" min="0" value="' + (open ? Math.abs(open) : '') + '" placeholder="0">') +
       fld('Devir yönü', '<select name="odir"><option value="1"' + (open >= 0 ? ' selected' : '') + '>Cari bize borçlu (alacak)</option><option value="-1"' + (open < 0 ? ' selected' : '') + '>Biz cariye borçluyuz</option></select>') +
-    '</div>' + fld('Adres / not', '<input name="note" value="' + esc(c ? c.note : '') + '">'),
+    '</div>' + fld('Adres / not', '<input name="note" value="' + esc(c ? c.note : '') + '">') +
+    '<h3 style="font-size:14px;margin:6px 0 8px">Fiyat tanımı</h3>' + cpFields(c || {}, true),
     function(f){
       var name = f.name.trim(); if(!name){ toast('Cari adı girin', 'err'); return false; }
       var o = r2(num(f.open) * num(f.odir));
       if(c){ c.name = name; c.type = f.type; c.phone = f.phone.trim(); c.note = f.note.trim(); c.open = o; }
       else { c = {id:uid(), name:name, type:f.type, phone:f.phone.trim(), note:f.note.trim(), open:o, created:today()}; db.caris.push(c); }
+      cpApply(c, f);
       var nc = c; commit(); toast('Cari kaydedildi'); if(after) after(nc);
     });
 }
@@ -1383,7 +1395,7 @@ A.addLine = function(d){ state.ed[d.type].lines.push({pid:'', qty:1, price:''});
 A.rmLine = function(d){ var ed = state.ed[d.type]; ed.lines.splice(+d.i, 1); if(!ed.lines.length) ed.lines.push({pid:'', qty:1, price:''}); render(); };
 A.payAll = function(d){ var ed = state.ed[d.type]; ed.pm = d.m; updateTotals(d.type); };
 A.credit = function(d){ var ed = state.ed[d.type]; ed.pm = null; ed.pay = {n:'', k:'', h:''}; ['n', 'k', 'h'].forEach(function(k){ var i = $('#p_' + k); if(i) i.value = ''; }); updateTotals(d.type); };
-A.quickCari = function(d){ cariForm(null, function(c){ state.ed[d.type].cariId = c.id; render(); }); };
+A.quickCari = function(d){ cariForm(null, function(c){ var ed = state.ed[d.type]; ed.cariId = c.id; var rn = reprice(d.type, ed); if(rn) toast(rn + ' satırın fiyatı güncellendi'); render(); }); };
 A.saveDoc = async function(d){
   var type = d.type, ed = state.ed[type];
   if(!can(DOC_PERM[type])){ toast('Bu işlem için yetkiniz yok', 'err'); return; }
