@@ -222,7 +222,7 @@ label.f>input,label.f>select,label.f>textarea{margin-top:4px;font-weight:400}
 <script>
 /* ---------- Veri ---------- */
 var KEY = 'stokcari_v1';
-var APP_VERSION = '2026.10.24-2';
+var APP_VERSION = '2026.10.24-3';
 function defaults(){ return {products:[],caris:[],docs:[],payments:[],moves:[],counters:{sale:0,purchase:0},seq:1,users:[],campaigns:[],settings:{name:'',phone:'',address:'',taxNo:'',footer:'',logo:'',logoRcpt:false,attrVals:[[],[],[],[],[]]}}; }
 function load(){
   try{ var s = localStorage.getItem(KEY); if(s){ var o = JSON.parse(s); return Object.assign(defaults(), o); } }catch(e){}
@@ -546,6 +546,17 @@ function campScope(c){
   sl.avs.forEach(function(a, i){ if(a.length) parts.push((names2[i] || 'Özellik') + ' = ' + a.map(function(v){ return attrLabel(i, v); }).join(' veya ')); });
   return parts.length ? parts.join(' · ') : '(özellik seçilmemiş)';
 }
+/* Kampanya hedefi: aud='cari' ise yalnızca cids listesindeki carilere uygulanır (liste boşsa kimseye). Alan yoksa herkese. */
+function campWho(c, cariId){
+  if(c.aud !== 'cari') return true;
+  return !!cariId && Array.isArray(c.cids) && c.cids.indexOf(cariId) >= 0;
+}
+function campWhoText(c){
+  if(c.aud !== 'cari') return '';
+  var names = (Array.isArray(c.cids) ? c.cids : []).map(function(id){ return cari(id); }).filter(Boolean).map(function(x){ return x.name; });
+  if(!names.length) return 'Yalnızca seçili cariler: (cari yok, kimseye uygulanmaz)';
+  return 'Yalnızca: ' + (names.length <= 2 ? names.join(', ') : names.slice(0, 2).join(', ') + ' ve ' + (names.length - 2) + ' cari daha');
+}
 function campActive(c, date){ return c.active !== false && (!c.from || date >= c.from) && (!c.to || date <= c.to); }
 function campMatch(c, p){
   if(c.scope === 'all') return true;
@@ -559,11 +570,11 @@ function campMatch(c, p){
   }
   return any;
 }
-function bestCampaign(p, qty, price, date){
+function bestCampaign(p, qty, price, date, cariId){
   if(!p) return null;
   var best = null, gross = qty * price;
   db.campaigns.forEach(function(c){
-    if(!campActive(c, date) || !campMatch(c, p)) return;
+    if(!campActive(c, date) || !campWho(c, cariId) || !campMatch(c, p)) return;
     if(c.type === 'buy' && c.basket !== false) return;
     var amt = 0;
     if(c.type === 'buy'){
@@ -577,11 +588,11 @@ function bestCampaign(p, qty, price, date){
   });
   return best;
 }
-function anyCamp(p, date){
-  return db.campaigns.find(function(c){ return campActive(c, date) && campMatch(c, p); }) || null;
+function anyCamp(p, date, cariId){
+  return db.campaigns.find(function(c){ return campActive(c, date) && campWho(c, cariId) && campMatch(c, p); }) || null;
 }
 /* Sepet bazlı kampanya planı: satır kampanyaları + "N al M öde" (kapsama giren tüm ürünler birlikte) */
-function campPlan(type, date, raw){
+function campPlan(type, date, raw, cariId){
   var res = raw.map(function(){ return {amt:0, name:''}; });
   if(type !== 'sale') return res;
   var items = [];
@@ -591,8 +602,8 @@ function campPlan(type, date, raw){
     items.push({i:i, p:p, qty:qty, price:price, gross:qty * price});
   });
   var L = {};
-  items.forEach(function(it){ var b = bestCampaign(it.p, it.qty, it.price, date); if(b) L[it.i] = b; });
-  var baskets = db.campaigns.filter(function(c){ return c.type === 'buy' && c.basket !== false && campActive(c, date) && Math.floor(num(c.buy)) >= 2 && num(c.pay) >= 0 && num(c.pay) < num(c.buy); });
+  items.forEach(function(it){ var b = bestCampaign(it.p, it.qty, it.price, date, cariId); if(b) L[it.i] = b; });
+  var baskets = db.campaigns.filter(function(c){ return c.type === 'buy' && c.basket !== false && campActive(c, date) && campWho(c, cariId) && Math.floor(num(c.buy)) >= 2 && num(c.pay) >= 0 && num(c.pay) < num(c.buy); });
   var free = items.slice(), guard = 0;
   while(baskets.length && free.length && guard++ < 6){
     var best = null;
@@ -625,20 +636,20 @@ function campPlan(type, date, raw){
   items.forEach(function(it){ if(L[it.i]) res[it.i] = {amt:Math.min(r2(it.gross), r2(L[it.i].amt)), name:L[it.i].name}; });
   return res;
 }
-function priceLines(type, date, raw){
-  var plan = campPlan(type, date, raw);
+function priceLines(type, date, raw, cariId){
+  var plan = campPlan(type, date, raw, cariId);
   return raw.map(function(l, i){
     var p = prod(l.pid), qty = num(l.qty), price = num(l.price);
     if(!p || qty <= 0) return {gross:0, cDisc:0, camp:'', mDisc:0, net:0, avail:null, applied:false};
     var gross = r2(qty * price), cDisc = Math.min(gross, plan[i].amt), base = r2(gross - cDisc);
     var d = l.disc || {t:'%', v:''}, v = Math.max(0, num(d.v));
     var mDisc = v ? (d.t === '₺' ? Math.min(base, r2(v)) : r2(base * Math.min(100, v) / 100)) : 0;
-    var ac = (type === 'sale' && l.noCamp) ? anyCamp(p, date) : null;
+    var ac = (type === 'sale' && l.noCamp) ? anyCamp(p, date, cariId) : null;
     return {gross:gross, cDisc:cDisc, camp:cDisc > 0 ? plan[i].name : '', mDisc:mDisc, net:r2(base - mDisc), avail:ac ? {name:ac.name} : null, applied:cDisc > 0};
   });
 }
-function priceDoc(type, date, rawLines, dd){
-  var pls = priceLines(type, date, rawLines), lines = [];
+function priceDoc(type, date, rawLines, dd, cariId){
+  var pls = priceLines(type, date, rawLines, cariId), lines = [];
   rawLines.forEach(function(l, i){
     if(!l.pid || num(l.qty) <= 0) return;
     var pl = pls[i], p = prod(l.pid), d = l.disc || {t:'%', v:''};
@@ -660,7 +671,7 @@ function createDoc(o){
   var T = TYPES[o.type];
   var no = o.no;
   if(!no){ db.counters[o.type] = (db.counters[o.type] || 0) + 1; no = T.pre + '-' + String(db.counters[o.type]).padStart(4, '0'); }
-  var pr = priceDoc(o.type, o.date, o.lines, o.docDisc);
+  var pr = priceDoc(o.type, o.date, o.lines, o.docDisc, o.cariId);
   var lines = pr.lines.map(function(l){
     var p = prod(l.pid);
     l.cost = T.sellSide ? ((p && p.cost) || 0) : (l.qty ? Math.round(l.net / l.qty * 10000) / 10000 : 0);
@@ -748,7 +759,7 @@ V.panel = function(){
 };
 
 /* Satış / Alış / İade */
-function edPricing(type, ed){ return priceDoc(type, ed.date || today(), ed.lines, ed.docDisc); }
+function edPricing(type, ed){ return priceDoc(type, ed.date || today(), ed.lines, ed.docDisc, ed.cariId); }
 function vatLine(type, ed){
   var v = vatSplit(edPricing(type, ed).lines);
   return 'KDV hariç ' + money(v.net) + ' · KDV ' + money(v.vat) + ' · Girilen fiyatlar KDV dahildir';
@@ -808,7 +819,7 @@ function editorHTML(type, ed){
   var T = TYPES[type], ret = type === 'sret' || type === 'pret';
   var cs = db.caris.slice().sort(function(a, b){ return a.name.localeCompare(b.name, 'tr'); });
   var pr = edPricing(type, ed), tot = pr.total; syncPay(ed, tot); var paid = edPaid(ed);
-  var pls = priceLines(type, ed.date || today(), ed.lines);
+  var pls = priceLines(type, ed.date || today(), ed.lines, ed.cariId);
   var discOk = type !== 'sale' || can('sales.discount'), priceOk = type !== 'sale' || can('sales.price');
   var refUI = '';
   if(ret){
@@ -862,7 +873,7 @@ function editorHTML(type, ed){
 function updateTotals(type){
   var ed = state.ed[type]; if(!ed || !$('#tot')) return;
   var pr = edPricing(type, ed), t = pr.total;
-  var pls = priceLines(type, ed.date || today(), ed.lines);
+  var pls = priceLines(type, ed.date || today(), ed.lines, ed.cariId);
   if(ed.pm){
     syncPay(ed, t);
     ['n', 'k', 'h'].forEach(function(k){ var i = $('#p_' + k); if(i) i.value = ed.pay[k]; });
@@ -1474,7 +1485,7 @@ A.backCari = function(){ state.cariId = null; render(); };
 A.delCari = function(d){
   var used = db.docs.some(function(x){ return x.cariId === d.id; }) || db.payments.some(function(p){ return p.cariId === d.id; });
   if(used){ toast('Bu carinin hareketleri var, silinemez', 'err'); return; }
-  confirmBox('Cari kartı silinecek.', function(){ db.caris = db.caris.filter(function(c){ return c.id !== d.id; }); state.cariId = null; commit(); toast('Cari silindi'); });
+  confirmBox('Cari kartı silinecek.', function(){ db.campaigns.forEach(function(k){ if(Array.isArray(k.cids)) k.cids = k.cids.filter(function(id){ return id !== d.id; }); }); db.caris = db.caris.filter(function(c){ return c.id !== d.id; }); state.cariId = null; commit(); toast('Cari silindi'); });
 };
 A.newPay = function(d){ if(!can(d.dir === 'out' ? 'payout' : 'collect')){ toast('Bu işlem için yetkiniz yok', 'err'); return; } payForm(d.dir, d.cid); };
 A.delPay = function(d){ confirmBox('Bu kayıt silinecek ve cari bakiyesi yeniden hesaplanacak.', function(){ db.payments = db.payments.filter(function(p){ return p.id !== d.id; }); commit(); }); };
@@ -1621,7 +1632,7 @@ document.addEventListener('keydown', function(e){
 document.addEventListener('input', function(e){
   var t = e.target;
   if(t.dataset.lb !== undefined){ lbChange(t); return; }
-  if(t.dataset.cf !== undefined){ campFilter(t.value); return; }
+  if(t.dataset.cf !== undefined){ campFilter(t.value, t.dataset.cf === '1' ? 'pickprod' : t.dataset.cf); return; }
   if(t.dataset.cpf !== undefined){ cpFilter(t.value); return; }
   if(t.id === 'stq'){ state.sq.q = t.value; stRefresh(); return; }
   if(t.id === 'bbq'){ bbFilter(); return; }
@@ -1651,8 +1662,8 @@ document.addEventListener('change', function(e){
   if(t.dataset.dqt){ state.dq[t.dataset.dqt].t = t.value; refreshDocList(t.dataset.dqt); return; }
   if(t.dataset.bbf !== undefined){ bbFilter(); return; }
   if(t.dataset.lblf !== undefined){ lblFilter(); return; }
-  if((t.name === 'type' || t.name === 'scope') && $('#mf')) campToggle();
-  if($('#mf') && /^(pid|av):/.test(t.name || '')) campCount();
+  if((t.name === 'type' || t.name === 'scope' || t.name === 'aud') && $('#mf')) campToggle();
+  if($('#mf') && /^(pid|av|cid):/.test(t.name || '')) campCount();
   if(t.tagName === 'SELECT') onEd(e);
 });
 
@@ -1661,17 +1672,17 @@ function campStatus(c, t){ return c.active === false ? 'Pasif' : campActive(c, t
 function campList(){
   if(!db.campaigns.length) return '<div class="empty">Henüz kampanya yok. Örnekler: “Çay ürünlerinde %10 indirim”, “3 al 2 öde”.</div>';
   var t = today(), q = nz(state.q.campaigns);
-  var list = db.campaigns.filter(function(c){ return !q || nz(c.name + ' ' + campText(c) + ' ' + campScope(c) + ' ' + campStatus(c, t) + ' ' + (c.from || '') + ' ' + (c.to || '')).indexOf(q) >= 0; });
+  var list = db.campaigns.filter(function(c){ return !q || nz(c.name + ' ' + campText(c) + ' ' + campScope(c) + ' ' + campWhoText(c) + ' ' + campStatus(c, t) + ' ' + (c.from || '') + ' ' + (c.to || '')).indexOf(q) >= 0; });
   if(!list.length) return '<div class="empty">Aramanıza uyan kampanya yok.</div>';
   return '<div class="tbl"><table><thead><tr><th>Kampanya</th><th>Kural</th><th>Kapsam</th><th>Tarih</th><th>Durum</th><th></th></tr></thead><tbody>' + list.map(function(c){
     var st = c.active === false ? '<span class="tag bad">Pasif</span>' : campActive(c, t) ? '<span class="tag sale">Geçerli</span>' : '<span class="tag warn">Tarih dışı</span>';
     var dt = (c.from || c.to) ? (c.from ? fd(c.from) : '…') + ' – ' + (c.to ? fd(c.to) : '…') : 'Süresiz';
-    return '<tr><td><b>' + esc(c.name) + '</b></td><td>' + esc(campText(c)) + '</td><td>' + esc(campScope(c)) + '</td><td class="nw">' + dt + '</td><td>' + st + '</td><td class="r">' + (can('campaigns.edit') ? '<button class="btn sm" data-act="togCamp" data-id="' + c.id + '">' + (c.active === false ? 'Aç' : 'Kapat') + '</button> <button class="btn sm" data-act="editCamp" data-id="' + c.id + '">Düzenle</button> <button class="btn sm danger" data-act="delCamp" data-id="' + c.id + '">Sil</button>' : '') + '</td></tr>';
+    return '<tr><td><b>' + esc(c.name) + '</b></td><td>' + esc(campText(c)) + '</td><td>' + esc(campScope(c)) + (campWhoText(c) ? '<div class="muted" style="font-size:12px">' + esc(campWhoText(c)) + '</div>' : '') + '</td><td class="nw">' + dt + '</td><td>' + st + '</td><td class="r">' + (can('campaigns.edit') ? '<button class="btn sm" data-act="togCamp" data-id="' + c.id + '">' + (c.active === false ? 'Aç' : 'Kapat') + '</button> <button class="btn sm" data-act="editCamp" data-id="' + c.id + '">Düzenle</button> <button class="btn sm danger" data-act="delCamp" data-id="' + c.id + '">Sil</button>' : '') + '</td></tr>';
   }).join('') + '</tbody></table></div>';
 }
 V.campaigns = function(){
   return '<div class="bar"><h2>Kampanyalar</h2><span class="spacer"></span>' + (can('campaigns.edit') ? '<button class="btn pri" data-act="newCamp">+ Yeni kampanya</button>' : '') + '</div>' +
-    '<div class="legend">Kampanyalar yalnızca satışlarda, tarih aralığı içinde ve kapsama uyan ürünlerde otomatik uygulanır. Bir ürüne birden fazla kampanya uyarsa en çok indirim sağlayanı geçerli olur, kampanyalar toplanmaz. Satış ekranında satır bazında kaldırabilirsiniz. Manuel iskonto, kampanyadan sonra kalan tutara uygulanır. “N al M öde” kampanyası varsayılan olarak sepet bazında çalışır: kapsama giren tüm ürünler birlikte sayılır ve her N ürünün en ucuz (N−M) tanesi bedava olur.</div>' +
+    '<div class="legend">Kampanyalar yalnızca satışlarda, tarih aralığı içinde ve kapsama uyan ürünlerde otomatik uygulanır. Kampanyayı herkese ya da yalnızca seçtiğiniz carilere verebilirsiniz (carisiz satışlara yalnızca herkese açık kampanyalar uygulanır). Bir ürüne birden fazla kampanya uyarsa en çok indirim sağlayanı geçerli olur, kampanyalar toplanmaz. Satış ekranında satır bazında kaldırabilirsiniz. Manuel iskonto, kampanyadan sonra kalan tutara uygulanır. “N al M öde” kampanyası varsayılan olarak sepet bazında çalışır: kapsama giren tüm ürünler birlikte sayılır ve her N ürünün en ucuz (N−M) tanesi bedava olur.</div>' +
     '<div class="card" style="padding:10px"><input class="search" style="max-width:none" type="search" data-q="campaigns" placeholder="Kampanya adı, kural, kapsam veya durum ara" value="' + esc(state.q.campaigns) + '" autocomplete="off"></div><div id="list">' + campList() + '</div>';
 };
 function campToggle(){
@@ -1679,19 +1690,22 @@ function campToggle(){
   var ty = f.elements.type.value, sc = f.elements.scope.value;
   f.querySelectorAll('[data-ft]').forEach(function(el){ el.hidden = el.dataset.ft.split(' ').indexOf(ty) < 0; });
   f.querySelectorAll('[data-fs]').forEach(function(el){ el.hidden = el.dataset.fs !== sc; });
+  var au = f.elements.aud ? f.elements.aud.value : 'all';
+  f.querySelectorAll('[data-fa]').forEach(function(el){ el.hidden = el.dataset.fa !== au; });
   campCount();
 }
 function campCount(){
-  var f = $('#mf'), el = $('#campcnt'); if(!f || !el) return;
-  var n = f.querySelectorAll('input[name^="pid:"]:checked').length;
-  el.textContent = n ? n + ' ürün seçili' : 'Henüz ürün seçilmedi';
+  var f = $('#mf'), el = $('#campcnt'); if(!f) return;
+  if(el){ var n = f.querySelectorAll('input[name^="pid:"]:checked').length; el.textContent = n ? n + ' ürün seçili' : 'Henüz ürün seçilmedi'; }
+  var e2 = $('#campcnt2');
+  if(e2){ var m = f.querySelectorAll('input[name^="cid:"]:checked').length; e2.textContent = m ? m + ' cari seçili' : 'Henüz cari seçilmedi'; }
 }
-function campFilter(q){
+function campFilter(q, id){
   q = nz(q);
-  document.querySelectorAll('#pickprod label').forEach(function(l){ l.style.display = !q || l.dataset.t.indexOf(q) >= 0 ? '' : 'none'; });
+  document.querySelectorAll('#' + (id || 'pickprod') + ' label').forEach(function(l){ l.style.display = !q || l.dataset.t.indexOf(q) >= 0 ? '' : 'none'; });
 }
 A.campPick = function(d){
-  document.querySelectorAll('#pickprod label').forEach(function(l){ if(l.style.display === 'none') return; var cb = l.querySelector('input'); if(cb) cb.checked = d.m === 'on'; });
+  document.querySelectorAll('#' + (d.t || 'pickprod') + ' label').forEach(function(l){ if(l.style.display === 'none') return; var cb = l.querySelector('input'); if(cb) cb.checked = d.m === 'on'; });
   campCount();
 };
 function campForm(id){
@@ -1699,6 +1713,8 @@ function campForm(id){
   var names = attrNames(), sl = campSel(c || {});
   var sel = function(a, b){ return a === b ? ' selected' : ''; };
   var prodSorted = db.products.slice().sort(function(a, b){ return a.name.localeCompare(b.name, 'tr'); });
+  var cids0 = c && Array.isArray(c.cids) ? c.cids : [], isCari = !!(c && c.aud === 'cari');
+  var cariSorted = db.caris.filter(function(x){ return x.type !== 'tedarikci' || cids0.indexOf(x.id) >= 0; }).sort(function(a, b){ return a.name.localeCompare(b.name, 'tr'); });
   modal(c ? 'Kampanyayı düzenle' : 'Yeni kampanya',
     fld('Kampanya adı', '<input name="name" required value="' + esc(c ? c.name : '') + '">') +
     fld('Kampanya türü', '<select name="type"><option value="pct"' + sel(c && c.type, 'pct') + '>Yüzde indirim</option><option value="amt"' + sel(c && c.type, 'amt') + '>Tutar indirimi (birim başına ₺)</option><option value="buy"' + sel(c && c.type, 'buy') + '>N al M öde (örn. 3 al 2 öde)</option></select>') +
@@ -1719,6 +1735,11 @@ function campForm(id){
           return '<label class="chk pk"><input type="checkbox" name="av:' + i + ':' + esc(v.c) + '"' + (on ? ' checked' : '') + '> <span>' + esc(v.c) + (v.d && v.d !== v.c ? ' – ' + esc(v.d) : '') + '</span></label>';
         }).join('') + '</div>' : '<div class="muted" style="font-size:13px">Değer tanımlı değil. Önce Özellikler sekmesinde tanımlayın.</div>') + '</div>';
       }).join('') + '</div>' +
+    fld('Kimlere uygulanır', '<select name="aud"><option value="all"' + (isCari ? '' : ' selected') + '>Herkese (cari olsun olmasın)</option><option value="cari"' + (isCari ? ' selected' : '') + '>Yalnızca seçtiğim carilere</option></select>') +
+    '<div data-fa="cari"><div class="pickbar"><input type="search" data-cf="pickcari" placeholder="Cari adı veya telefon ara" autocomplete="off"><button type="button" class="btn sm" data-act="campPick" data-m="on" data-t="pickcari">Görünenleri seç</button><button type="button" class="btn sm" data-act="campPick" data-m="off" data-t="pickcari">Görünenleri kaldır</button></div>' +
+      '<div class="pick" id="pickcari">' + (cariSorted.length ? cariSorted.map(function(x){
+        return '<label class="chk pk" data-t="' + esc(nz(x.name + ' ' + (x.phone || ''))) + '"><input type="checkbox" name="cid:' + esc(x.id) + '"' + (cids0.indexOf(x.id) >= 0 ? ' checked' : '') + '> <span>' + esc(x.name) + (x.phone ? ' <span class="muted">· ' + esc(x.phone) + '</span>' : '') + '</span></label>';
+      }).join('') : '<div class="muted">Henüz müşteri carisi yok. Önce Cariler sekmesinden ekleyin.</div>') + '</div><div class="muted" id="campcnt2" style="font-size:12px;margin-top:4px"></div></div>' +
     '<div class="cols">' + fld('Başlangıç (isteğe bağlı)', '<input name="from" type="date" value="' + esc(c ? c.from : '') + '">') + fld('Bitiş (isteğe bağlı)', '<input name="to" type="date" value="' + esc(c ? c.to : '') + '">') + '</div>' +
     fld('Durum', '<select name="active"><option value="1">Aktif</option><option value="0"' + (c && c.active === false ? ' selected' : '') + '>Pasif</option></select>'),
     function(f){
@@ -1734,10 +1755,12 @@ function campForm(id){
       if(f.type === 'pct'){ if(o.v <= 0 || o.v > 100){ toast('Yüzde değeri 0 ile 100 arasında olmalı', 'err'); return false; } }
       else if(f.type === 'amt'){ if(o.v <= 0){ toast('İndirim tutarı girin', 'err'); return false; } }
       else { o.v = 0; o.basket = f.basket !== '0'; o.buy = Math.floor(num(f.buy)); o.pay = Math.floor(num(f.pay)); if(o.buy < 2 || o.pay < 0 || o.pay >= o.buy){ toast('Örnek: 3 al 2 öde. Ödenen adet alınandan küçük olmalı.', 'err'); return false; } }
+      var cids = Object.keys(f).filter(function(k){ return k.indexOf('cid:') === 0; }).map(function(k){ return k.slice(4); });
+      if(f.aud === 'cari'){ o.aud = 'cari'; o.cids = cids; if(!cids.length){ toast('En az bir cari seçin', 'err'); return false; } }
       if(o.scope === 'prod' && !pids.length){ toast('En az bir ürün seçin', 'err'); return false; }
       if(o.scope === 'attr' && !o.av){ toast('En az bir özellik değeri seçin. Değer yoksa önce Özellikler sekmesinde tanımlayın.', 'err'); return false; }
       if(o.from && o.to && o.to < o.from){ toast('Bitiş tarihi başlangıçtan önce olamaz', 'err'); return false; }
-      if(c){ Object.assign(c, o); if(o.scope !== 'prod') delete c.pids; if(o.scope !== 'attr') delete c.avs; } else { o.id = uid(); db.campaigns.push(o); }
+      if(c){ Object.assign(c, o); if(o.scope !== 'prod') delete c.pids; if(o.scope !== 'attr') delete c.avs; if(o.aud !== 'cari'){ delete c.aud; delete c.cids; } } else { o.id = uid(); db.campaigns.push(o); }
       commit(); toast('Kampanya kaydedildi');
     });
   campToggle();
@@ -2971,7 +2994,7 @@ async function loadSnapshot(userId){
   sync.snap = snapRows(); sync.since = r.ver; sync.pending = 0; sync.retry = 0; setSyncState('ok');
 }
 function canon(v){
-  if(Array.isArray(v)) return v.map(canon);
+  if(Array.isArray(v)) return v.length ? v.map(canon) : undefined;                  // boş liste ile eksik alan aynı sayılır
   if(v && typeof v === 'object'){ var o = {}; Object.keys(v).sort().forEach(function(k){ var x = canon(v[k]); if(x !== '' && x !== null && x !== undefined) o[k] = x; }); return o; }
   return v;
 }
@@ -3012,7 +3035,7 @@ async function pollOnce(){
     var changed = applyRemote(r); sync.since = r.ver;
     if(sync.state === 'err') setSyncState('ok');
     if(changed || sync.renderPending) maybeRender();
-  }catch(e){ if(e.status === 401) srvLogout('Oturum süresi doldu, yeniden giriş yapın'); else setSyncState('err'); }
+  }catch(e){ if(e.status === 401) srvLogout('Oturum süresi doldu, yeniden giriş yapın'); else { sync.pending = computeOps().ops.length; setSyncState('err'); } }
 }
 /* Giriş ekranında görünsün diye firma adı ve logo (yalnızca bu ikisi) girişsiz alınır */
 async function loadBrand(){
