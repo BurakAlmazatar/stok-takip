@@ -2,7 +2,7 @@
    Amaç: uygulamayı internet olmadan da açmak. Kayıtlarınıza (tarayıcı deposu) dokunmaz.
    Güncelleme: sayfa açılırken önce internetteki yeni sürüm alınır, internet yoksa kayıtlı kopya açılır.
    Gerekirse aşağıdaki sürüm adını değiştirerek eski önbelleği temizleyebilirsiniz. */
-const CACHE = 'stokcari-v2';
+const CACHE = 'stokcari-v3';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './icon-maskable-512.png', './apple-touch-icon.png', './favicon-32.png'];
 
 self.addEventListener('install', function(e){
@@ -30,6 +30,10 @@ self.addEventListener('fetch', function(e){
         return caches.match('./index.html').then(function(r){ return r || caches.match('./'); });
       })
     );
+    return;
+  }
+  if(u.pathname.endsWith('/manifest.webmanifest')){
+    e.respondWith(fetch(req, {cache:'no-store'}).catch(function(){ return caches.match(req); }));
     return;
   }
   e.respondWith(
