@@ -3,14 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Stok ve Cari Takip - Github</title>
-<link rel="manifest" href="manifest.webmanifest?v=20261023-1">
+<title>Stok ve Cari Takip</title>
+<link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#18202b" media="(prefers-color-scheme: dark)">
-<meta name="application-name" content="Stok ve Cari Takip - Github">
+<meta name="application-name" content="Stok ve Cari Takip">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="Stok ve Cari Takip - Github">
+<meta name="apple-mobile-web-app-title" content="Stok Cari">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
@@ -183,6 +183,14 @@ label.f>input,label.f>select,label.f>textarea{margin-top:4px;font-weight:400}
 .cpi{width:110px;text-align:right}
 @media(max-width:640px){.cpbox table{font-size:13px;min-width:0}.cpbox th,.cpbox td{padding:6px 5px}.cpi{width:78px;padding:6px 7px}}
 .cpdet{margin:4px 0 10px}
+#vgrid .cpi{width:68px;padding:6px 7px}
+#vgrid th,#vgrid td{padding:6px 6px}
+#vgrid .tbl{margin-bottom:8px}
+.vbi{width:100%;min-width:150px}
+.varpick{margin-bottom:8px}
+.pick.vp{max-height:140px}
+.vsel{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}
+.vsel select{flex:1 1 120px;min-width:0}
 .cpdet summary{cursor:pointer;font-weight:600;font-size:13px;padding:6px 0}
 .chk input{width:auto;min-height:0}
 #usr{margin-left:auto}
@@ -222,7 +230,7 @@ label.f>input,label.f>select,label.f>textarea{margin-top:4px;font-weight:400}
 <script>
 /* ---------- Veri ---------- */
 var KEY = 'stokcari_v1';
-var APP_VERSION = '2026.10.24-3';
+var APP_VERSION = '2026.10.25-4';
 function defaults(){ return {products:[],caris:[],docs:[],payments:[],moves:[],counters:{sale:0,purchase:0},seq:1,users:[],campaigns:[],settings:{name:'',phone:'',address:'',taxNo:'',footer:'',logo:'',logoRcpt:false,attrVals:[[],[],[],[],[]]}}; }
 function load(){
   try{ var s = localStorage.getItem(KEY); if(s){ var o = JSON.parse(s); return Object.assign(defaults(), o); } }catch(e){}
@@ -298,9 +306,9 @@ var ACT_PERM = {
   newCari:'caris.add', quickCari:'caris.add', editCari:'caris.edit', delCari:'caris.delete',
   delPay:'payments.delete',
   repPreset:'reports.view', repType:'reports.view', copyRep:'reports.view', repMethod:'payrep.view', copyPay:'payrep.view',
-  newCamp:'campaigns.edit', editCamp:'campaigns.edit', campPick:'campaigns.edit', cariPrices:'caris.edit', cpClear:'caris.edit', togCamp:'campaigns.edit', delCamp:'campaigns.edit',
+  newCamp:'campaigns.edit', editCamp:'campaigns.edit', campPick:'campaigns.edit', cariPrices:'caris.edit', cpClear:'caris.edit', addCat:'attrs.edit', editCat:'attrs.edit', delCat:'attrs.edit', moveCat:'attrs.edit', catQuick:'attrs.edit', togCamp:'campaigns.edit', delCamp:'campaigns.edit',
   saveAttrs:'attrs.edit', addVal:'attrs.edit', editVal:'attrs.edit', delVal:'attrs.edit',
-  saveName:'settings.edit', rmLogo:'settings.edit', saveRc:'settings.edit', saveLbl:'settings.edit', lblReset:'settings.edit', lblTest:'settings.edit', rcReset:'settings.edit', saveMenus:'settings.edit', menusReset:'settings.edit',
+  saveName:'settings.edit', rmLogo:'settings.edit', saveRc:'settings.edit', saveLbl:'settings.edit', saveEan:'settings.edit', eanReset:'settings.edit', lblReset:'settings.edit', lblTest:'settings.edit', rcReset:'settings.edit', saveMenus:'settings.edit', menusReset:'settings.edit',
   exportData:'admin', importData:'admin', downloadBackup:'admin', demo:'admin', wipe:'admin', newUser:'admin', editUser:'admin', delUser:'admin', permTpl:'admin'
 };
 function userName(id){ var u = db.users.find(function(x){ return x.id === id; }); return u ? u.name : '—'; }
@@ -349,6 +357,77 @@ var prod = function(id){ return db.products.find(function(p){ return p.id === id
 var cari = function(id){ return db.caris.find(function(c){ return c.id === id; }); };
 function cariName(id){ if(!id) return 'Perakende'; var c = cari(id); return c ? c.name : '(silinmiş cari)'; }
 function stockOf(pid){ return r2(sum(db.moves.filter(function(m){ return m.pid === pid; }), function(m){ return m.qty; })); }
+/* Renk / beden (varyant): ürün kartında ayrı alan (colors, sizes). Hareket ve belge satırlarında cl (renk) ve sz (beden) tutulur. */
+function nv(x){ return String(x || ''); }
+function varCat(kind){ var st = db.settings || {}, a = st[kind === 'color' ? 'colorCat' : 'sizeCat']; return Array.isArray(a) ? a : []; }
+function catFind(kind, text){ var t = lk(text); if(!t) return null; var f = varCat(kind).find(function(x){ return lk(x.c) === t || lk(x.d) === t; }); return f ? f.c : null; }
+function catLabel(kind, code){ code = nv(code); if(!code) return ''; var f = varCat(kind).find(function(x){ return lk(x.c) === lk(code); }); return f && f.d ? f.d : code; }
+function catSort(kind, list){                                   // listedeki sıraya göre (bedenler S, M, L, XL gibi tanımlı sırayla görünür)
+  var cat = varCat(kind); if(list.length < 2 || !cat.length) return list;
+  var idx = function(v){ var i = cat.findIndex(function(x){ return lk(x.c) === lk(v); }); return i < 0 ? 99999 : i; };
+  return list.slice().sort(function(a, b){ return idx(a) - idx(b); });
+}
+function vbits(p){ return {c:(p && Array.isArray(p.colors)) ? catSort('color', p.colors) : [], s:(p && Array.isArray(p.sizes)) ? catSort('size', p.sizes) : []}; }
+function hasVar(p){ var v = vbits(p); return !!(v.c.length || v.s.length); }
+function varLabel(cl, sz){ return [catLabel('color', cl), catLabel('size', sz)].filter(Boolean).join(' / '); }
+function vkey(l){ return l.pid + '|' + nv(l.cl) + '|' + nv(l.sz); }
+function stockV(pid, cl, sz){ cl = nv(cl); sz = nv(sz); return r2(sum(db.moves.filter(function(m){ return m.pid === pid && nv(m.cl) === cl && nv(m.sz) === sz; }), function(m){ return m.qty; })); }
+function lk(x){ var k = nz(x); return k || String(x).toLowerCase(); }
+function parseList(txt){
+  var seen = {}, out = [];
+  String(txt || '').split(/[,;\n]/).forEach(function(x){
+    x = x.replace(/\|/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 40);
+    var k = lk(x); if(!x || seen[k]) return; seen[k] = 1; out.push(x);
+  });
+  return out.slice(0, 40);
+}
+function varUsed(p, kind, val){
+  return db.moves.some(function(m){ return m.pid === p.id && m[kind] === val; }) || db.docs.some(function(d){ return d.lines.some(function(l){ return l.pid === p.id && l[kind] === val; }); });
+}
+function vkeyOf(cl, sz){ return nv(cl) + '|' + nv(sz); }
+function vbcOf(p){ return (p && p.vbc && typeof p.vbc === 'object') ? p.vbc : {}; }
+function varList(p){
+  var vb = vbits(p), out = [], m = vbcOf(p);
+  if(!vb.c.length && !vb.s.length) return out;
+  (vb.c.length ? vb.c : ['']).forEach(function(c){ (vb.s.length ? vb.s : ['']).forEach(function(z){ var k = vkeyOf(c, z); out.push({cl:c, sz:z, key:k, label:varLabel(c, z), bc:m[k] || ''}); }); });
+  return out;
+}
+function hasVbc(p){ var m = vbcOf(p); return Object.keys(m).some(function(k){ return m[k]; }); }
+function bcText(p){ var m = vbcOf(p); return [p.barcode].concat(Object.keys(m).map(function(k){ return m[k]; })).filter(Boolean).join(' '); }
+function barcodeTaken(bc, exPid){                              // başka bir ürünün barkodu ya da varyant barkodu mu?
+  if(!bc) return null;
+  for(var i = 0; i < db.products.length; i++){
+    var p = db.products[i]; if(p.id === exPid) continue;
+    if(p.barcode === bc) return p;
+    var m = vbcOf(p), ks = Object.keys(m);
+    for(var j = 0; j < ks.length; j++) if(m[ks[j]] === bc) return p;
+  }
+  return null;
+}
+function findByCode(lc){                                       // barkod (ürün veya varyant) önce, sonra ürün kodu
+  var i, j, p, m, ks;
+  for(i = 0; i < db.products.length; i++){
+    p = db.products[i];
+    if(p.barcode && p.barcode.toLowerCase() === lc) return {p:p};
+    m = vbcOf(p); ks = Object.keys(m);
+    for(j = 0; j < ks.length; j++) if(String(m[ks[j]]).toLowerCase() === lc){ var ab = ks[j].split('|'); return {p:p, cl:ab[0] || '', sz:ab[1] || '', v:true}; }
+  }
+  var pc = db.products.find(function(x){ return x.code && x.code.toLowerCase() === lc; });
+  return pc ? {p:pc} : null;
+}
+function missingBcCount(p){ return hasVar(p) ? varList(p).filter(function(v){ return !v.bc; }).length : (p.barcode ? 0 : 1); }
+function assignBc(p){                                          // eksik barkodları verir; etiket anahtarlarını döndürür
+  var keys = [];
+  if(hasVar(p)){ varList(p).forEach(function(v){ if(v.bc) return; p.vbc = p.vbc || {}; var b = nextEan(); if(!b) return; p.vbc[v.key] = b; keys.push(p.id + '~' + v.key); }); }
+  else if(!p.barcode){ var b2 = nextEan(); if(b2){ p.barcode = b2; keys.push(p.id); } }
+  return keys;
+}
+function varSummary(p){
+  var vb = vbits(p), bits = [];
+  if(vb.c.length) bits.push('Renk: ' + vb.c.map(function(x){ return catLabel('color', x); }).join(', '));
+  if(vb.s.length) bits.push('Beden: ' + vb.s.map(function(x){ return catLabel('size', x); }).join(', '));
+  return bits.join(' · ');
+}
 var KIND = {sale:'Satış', purchase:'Alış', sret:'Satış iadesi', pret:'Alış iadesi', 'in':'Tahsilat', out:'Ödeme'};
 var TYPES = {
   sale:{pre:'S', cashIn:true, stock:-1, sellSide:true, paidLabel:'Tahsil edilen'},
@@ -458,12 +537,31 @@ function render(){
 /* ---------- Belge oluşturma ---------- */
 /* ---------- Barkod (EAN-13) ---------- */
 function ean13Check(d12){ var t = 0; for(var i = 0; i < 12; i++){ t += (+d12[i]) * (i % 2 ? 3 : 1); } return (10 - t % 10) % 10; }
-function nextEan(){
-  var max = 0;
-  db.products.forEach(function(p){ if(p.barcode && /^29\d{11}$/.test(p.barcode)) max = Math.max(max, parseInt(p.barcode.slice(2, 12), 10)); });
-  var body = '29' + String(max + 1).padStart(10, '0');
+function eanPrefix(){                                          // Ayarlar > Barkod başlangıcı (varsayılan 29)
+  var p = String((db.settings && db.settings.eanPrefix) || '').replace(/\D/g, '');
+  return (p && p.length <= 9) ? p : '29';
+}
+function eanStats(pf, extra){                                  // bu başlangıçla verilmiş numaralar
+  var used = {}, max = 0, count = 0;
+  var chk = function(b){
+    b = String(b || '');
+    if(b.length === 13 && /^\d{13}$/.test(b) && b.indexOf(pf) === 0){ var sq = parseInt(b.slice(pf.length, 12), 10); if(sq > 0){ used[sq] = 1; count++; if(sq > max) max = sq; } }
+  };
+  db.products.forEach(function(p){ chk(p.barcode); var m = vbcOf(p); Object.keys(m).forEach(function(k){ chk(m[k]); }); });
+  (extra || []).forEach(chk);
+  return {used:used, max:max, count:count, n:12 - pf.length, cap:Math.pow(10, 12 - pf.length) - 1};
+}
+function nextEanFor(pf, extra, quiet){
+  var st = eanStats(pf, extra), seq = st.max + 1;
+  if(seq > st.cap){                                            // sona gelindi: aradaki boş numaraları ara
+    seq = 0;
+    for(var k = 1; k <= st.cap && k <= 300000; k++) if(!st.used[k]){ seq = k; break; }
+  }
+  if(!seq){ if(!quiet) toast('Bu başlangıçla üretilebilecek barkod numaraları tükendi. Ayarlar > Barkod başlangıcı bölümünden başlangıcı değiştirin.', 'err'); return ''; }
+  var body = pf + String(seq).padStart(st.n, '0');
   return body + ean13Check(body);
 }
+function nextEan(extra){ return nextEanFor(eanPrefix(), extra); }
 function ean13Svg(code, o){
   if(!/^\d{13}$/.test(code) || ean13Check(code.slice(0, 12)) !== +code[12]) return '';
   var L = ['0001101','0011001','0010011','0111101','0100011','0110001','0101111','0111011','0110111','0001011'];
@@ -510,6 +608,16 @@ function ensureAttrVals(){
     if(c.av && c.ai >= 0 && c.ai < 5) c.av = add(c.ai, c.av);
     if(Array.isArray(c.avs)) c.avs.forEach(function(a, i){ if(i < 5 && Array.isArray(a)) c.avs[i] = a.map(function(x){ return add(i, x); }).filter(Boolean); });
   });
+  ensureVarCat();
+}
+function ensureVarCat(){
+  var st = db.settings; if(!st) return;
+  if(!Array.isArray(st.colorCat)) st.colorCat = [];
+  if(!Array.isArray(st.sizeCat)) st.sizeCat = [];
+  var add = function(arr, v){ v = String(v || '').trim(); if(!v) return; var l = lk(v); if(!arr.some(function(x){ return lk(x.c) === l; })) arr.push({c:v, d:v}); };
+  (db.products || []).forEach(function(p){ (p.colors || []).forEach(function(v){ add(st.colorCat, v); }); (p.sizes || []).forEach(function(v){ add(st.sizeCat, v); }); });
+  (db.moves || []).forEach(function(m){ if(m.cl) add(st.colorCat, m.cl); if(m.sz) add(st.sizeCat, m.sz); });
+  (db.docs || []).forEach(function(d){ (d.lines || []).forEach(function(l){ if(l.cl) add(st.colorCat, l.cl); if(l.sz) add(st.sizeCat, l.sz); }); });
 }
 function attrTags(p){
   var n = attrNames(), out = '';
@@ -654,6 +762,7 @@ function priceDoc(type, date, rawLines, dd, cariId){
     if(!l.pid || num(l.qty) <= 0) return;
     var pl = pls[i], p = prod(l.pid), d = l.disc || {t:'%', v:''};
     lines.push({pid:l.pid, qty:num(l.qty), price:num(l.price), gross:pl.gross, cDisc:pl.cDisc, camp:pl.camp, mDisc:pl.mDisc, md:{t:d.t === '₺' ? '₺' : '%', v:num(d.v)}, gDisc:0, net:pl.net, vat:pv(p)});
+    var lx = lines[lines.length - 1]; if(l.cl) lx.cl = l.cl; if(l.sz) lx.sz = l.sz;
   });
   var sub = r2(sum(lines, function(x){ return x.net; }));
   var dv = dd ? Math.max(0, num(dd.v)) : 0;
@@ -690,7 +799,9 @@ function createDoc(o){
   var doc = {id:uid(), no:no, type:o.type, date:o.date, cariId:o.cariId || '', lines:lines, total:total, gross:pr.gross, docDisc:pr.docDisc, paid:paid, pays:pays, note:o.note || '', ref:od ? od.id : '', refNo:od ? od.no : '', by:(cur() || {}).id || '', ts:Date.now() + db.seq};
   db.docs.push(doc);
   lines.forEach(function(l){
-    db.moves.push({id:uid(), pid:l.pid, qty:T.stock * l.qty, date:o.date, reason:KIND[o.type], ref:doc.id, no:no, ts:doc.ts});
+    var mv0 = {id:uid(), pid:l.pid, qty:T.stock * l.qty, date:o.date, reason:KIND[o.type], ref:doc.id, no:no, ts:doc.ts};
+    if(l.cl) mv0.cl = l.cl; if(l.sz) mv0.sz = l.sz;
+    db.moves.push(mv0);
     if(o.type === 'purchase' && l.cost > 0){ var p = prod(l.pid); if(p) p.cost = l.cost; }
   });
   return doc;
@@ -792,17 +903,35 @@ function edPaid(ed){ return r2(num(ed.pay.n) + num(ed.pay.k) + num(ed.pay.h)); }
 function lineInfo(type, ed, i){
   var l = ed.lines[i], p = prod(l.pid);
   if(!p) return '';
-  var st = stockOf(p.id);
+  var vb = vbits(p), hv = hasVar(p), vl = hv ? varLabel(l.cl, l.sz) : '';
+  if(hv){
+    var miss = [vb.c.length && !l.cl ? 'renk' : '', vb.s.length && !l.sz ? 'beden' : ''].filter(Boolean).join(' ve ');
+    if(miss) return '<span class="neg">Önce ' + miss + ' seçin</span> <span class="muted">· Toplam stok: ' + qf(stockOf(p.id)) + ' ' + esc(p.unit) + '</span>';
+  }
+  var st = hv ? stockV(p.id, l.cl, l.sz) : stockOf(p.id), sfx = hv ? ' (' + esc(vl) + ')' : '';
+  var same = function(x){ return vkey(x) === vkey(l); };
   if(ed.ref && (type === 'sret' || type === 'pret')){
-    var rem = remainingQty(ed.ref, l.pid), need0 = sum(ed.lines.filter(function(x){ return x.pid === l.pid; }), function(x){ return num(x.qty); });
-    if(need0 > rem + 0.0001) return '<span class="neg">İade edilebilir en fazla ' + qf(rem) + ' ' + esc(p.unit) + '</span>';
-    return '<span class="muted">İade edilebilir: ' + qf(rem) + ' ' + esc(p.unit) + ' (bağlı belgeden)</span>';
+    var rem = remainingQty(ed.ref, l.pid, l.cl, l.sz), need0 = sum(ed.lines.filter(same), function(x){ return num(x.qty); });
+    if(need0 > rem + 0.0001) return '<span class="neg">İade edilebilir en fazla ' + qf(rem) + ' ' + esc(p.unit) + sfx + '</span>';
+    return '<span class="muted">İade edilebilir: ' + qf(rem) + ' ' + esc(p.unit) + sfx + ' (bağlı belgeden)</span>';
   }
   if(TYPES[type].stock < 0){
-    var need = sum(ed.lines.filter(function(x){ return x.pid === l.pid; }), function(x){ return num(x.qty); });
-    if(need > st) return '<span class="neg">Stok: ' + qf(st) + ' ' + esc(p.unit) + ' (yetersiz)</span>';
+    var need = sum(ed.lines.filter(same), function(x){ return num(x.qty); });
+    if(need > st) return '<span class="neg">Stok' + sfx + ': ' + qf(st) + ' ' + esc(p.unit) + ' (yetersiz)</span>';
   }
-  return '<span class="muted">Stok: ' + qf(st) + ' ' + esc(p.unit) + ' · KDV %' + pv(p) + '</span>';
+  return '<span class="muted">Stok' + sfx + ': ' + qf(st) + ' ' + esc(p.unit) + ' · KDV %' + pv(p) + '</span>';
+}
+function variantSel(type, ed, i, l){
+  var p = prod(l.pid); if(!p || !hasVar(p)) return '';
+  var vb = vbits(p), at = 'data-ed="' + type + '" data-i="' + i + '"', h = '<div class="vsel">';
+  if(vb.c.length) h += '<select ' + at + ' data-f="cl" aria-label="Renk"><option value="">Renk seçin</option>' + vb.c.map(function(c){
+    var st = vb.s.length ? '' : ' (stok ' + qf(stockV(p.id, c, '')) + ')';
+    return '<option value="' + esc(c) + '"' + (l.cl === c ? ' selected' : '') + '>' + esc(catLabel('color', c)) + st + '</option>'; }).join('') + '</select>';
+  if(vb.s.length) h += '<select ' + at + ' data-f="sz" aria-label="Beden"><option value="">Beden seçin</option>' + vb.s.map(function(z){
+    var st = (vb.c.length && !l.cl) ? '' : ' (stok ' + qf(stockV(p.id, vb.c.length ? l.cl : '', z)) + ')';
+    return '<option value="' + esc(z) + '"' + (l.sz === z ? ' selected' : '') + '>' + esc(catLabel('size', z)) + st + '</option>'; }).join('') + '</select>';
+  if(vb.c.length && vb.s.length) h += '<button type="button" class="btn sm" data-act="vgrid" data-type="' + type + '" data-i="' + i + '">Tablo ile gir</button>';
+  return h + '</div>';
 }
 function campInfo(type, pl, i){
   if(!pl) return '';
@@ -817,7 +946,7 @@ function discSel(attrs, d){
 }
 function editorHTML(type, ed){
   var T = TYPES[type], ret = type === 'sret' || type === 'pret';
-  var cs = db.caris.slice().sort(function(a, b){ return a.name.localeCompare(b.name, 'tr'); });
+  var cs = db.caris.filter(function(c){ return c.id === ed.cariId || (T.sellSide ? c.type !== 'tedarikci' : c.type !== 'musteri'); }).sort(function(a, b){ return a.name.localeCompare(b.name, 'tr'); });
   var pr = edPricing(type, ed), tot = pr.total; syncPay(ed, tot); var paid = edPaid(ed);
   var pls = priceLines(type, ed.date || today(), ed.lines, ed.cariId);
   var discOk = type !== 'sale' || can('sales.discount'), priceOk = type !== 'sale' || can('sales.price');
@@ -847,7 +976,7 @@ function editorHTML(type, ed){
     ed.lines.map(function(l, i){
       var d = l.disc || {t:'%', v:''};
       return '<div class="line">' +
-        '<div><select data-ed="' + type + '" data-i="' + i + '" data-f="pid"><option value="">Ürün seçin</option>' + (ed.ref ? docProducts(ed.ref) : db.products).map(function(p){ return '<option value="' + p.id + '"' + (l.pid === p.id ? ' selected' : '') + '>' + esc(p.name) + (p.barcode ? ' · ' + esc(p.barcode) : (p.code ? ' (' + esc(p.code) + ')' : '')) + '</option>'; }).join('') + '</select><div class="wn" id="w' + i + '">' + lineInfo(type, ed, i) + '</div></div>' +
+        '<div><select data-ed="' + type + '" data-i="' + i + '" data-f="pid"><option value="">Ürün seçin</option>' + (ed.ref ? docProducts(ed.ref) : db.products).map(function(p){ return '<option value="' + p.id + '"' + (l.pid === p.id ? ' selected' : '') + '>' + esc(p.name) + (p.barcode ? ' · ' + esc(p.barcode) : (p.code ? ' (' + esc(p.code) + ')' : '')) + '</option>'; }).join('') + '</select>' + variantSel(type, ed, i, l) + '<div class="wn" id="w' + i + '">' + lineInfo(type, ed, i) + '</div></div>' +
         '<input type="number" inputmode="decimal" step="any" min="0" placeholder="Miktar" value="' + esc(l.qty) + '" data-ed="' + type + '" data-i="' + i + '" data-f="qty" aria-label="Miktar">' +
         '<input class="pc" type="number" inputmode="decimal" step="any" min="0" placeholder="Fiyat (KDV dahil)" value="' + esc(l.price) + '"' + (priceOk ? '' : ' readonly') + ' data-ed="' + type + '" data-i="' + i + '" data-f="price" aria-label="Birim fiyat">' +
         '<div class="lt" id="lt' + i + '">' + money(pls[i].net) + '</div>' +
@@ -858,13 +987,13 @@ function editorHTML(type, ed){
     (discOk ? '<div class="ddisc"><b>Genel iskonto</b>' + discSel('data-ed="' + type + '" data-f="ddt"', dd) + '<input type="number" inputmode="decimal" step="any" min="0" placeholder="0" value="' + esc(dd.v) + '" data-ed="' + type + '" data-f="ddv" aria-label="Genel iskonto değeri"><span class="muted">Satırlardaki indirimlerden sonra toplam tutara uygulanır.</span></div>' : '') +
     '<div class="totals">' +
       '<div><div class="muted">Toplam</div><div class="big" id="tot">' + money(tot) + '</div></div>' +
-      '<div><div class="muted">Kalan (cariye yazılır)</div><div class="big" id="rest">' + money(Math.max(0, r2(tot - paid))) + '</div></div>' +
+      '<div><div class="muted">Kalan (cari hesaba aktarılır)</div><div class="big" id="rest">' + money(Math.max(0, r2(tot - paid))) + '</div></div>' +
     '</div>' +
     '<div class="muted" id="dsum" style="margin-top:8px">' + dsumText(pr) + '</div>' +
     '<div class="muted" id="vatl" style="margin-top:4px">' + vatLine(type, ed) + '</div>' +
     '<h3 style="margin-top:16px">' + T.paidLabel + ' tutar (ödeme yöntemine göre)</h3>' +
     '<div class="cols3">' + payIn('n', 'Nakit') + payIn('k', 'Kredi kartı') + payIn('h', 'Havale / EFT') + '</div>' +
-    '<div class="chips" style="margin:-4px 0 4px"><button type="button" class="btn sm" data-act="payAll" data-type="' + type + '" data-m="n">Tamamı nakit</button><button type="button" class="btn sm" data-act="payAll" data-type="' + type + '" data-m="k">Tamamı kart</button><button type="button" class="btn sm" data-act="payAll" data-type="' + type + '" data-m="h">Tamamı havale</button><button type="button" class="btn sm" data-act="credit" data-type="' + type + '">' + (ret ? 'Para iadesi yok' : 'Veresiye') + '</button></div>' +
+    '<div class="chips" style="margin:-4px 0 4px"><button type="button" class="btn sm" data-act="payAll" data-type="' + type + '" data-m="n">Tamamı nakit</button><button type="button" class="btn sm" data-act="payAll" data-type="' + type + '" data-m="k">Tamamı kart</button><button type="button" class="btn sm" data-act="payAll" data-type="' + type + '" data-m="h">Tamamı havale</button><button type="button" class="btn sm" data-act="credit" data-type="' + type + '">' + (ret ? 'Para iadesi yok' : 'Cari hesaba aktar') + '</button></div>' +
     '<div class="wn" id="payw"></div>' +
     '<div style="margin-top:12px">' + fld('Not', '<input type="text" value="' + esc(ed.note) + '" data-ed="' + type + '" data-f="note" placeholder="İsteğe bağlı">') + '</div>' +
     '<div class="row-end"><button class="btn" data-act="cancelDoc" data-type="' + type + '">Vazgeç</button><button class="btn pri" data-act="saveDoc" data-type="' + type + '">' + ED_SAVE[type] + '</button></div>' +
@@ -899,7 +1028,7 @@ function docMatch(d, f){
   if(f.to && d.date > f.to) return false;
   var q = nz(f.q); if(!q) return true;
   var txt = d.no + ' ' + KIND[d.type] + ' ' + cariName(d.cariId) + ' ' + userName(d.by) + ' ' + (d.note || '') + ' ' + (d.refNo || '') + ' ' + money(d.total) + ' ' + d.lines.map(function(l){
-    var p = prod(l.pid); return p ? p.name + ' ' + (p.code || '') + ' ' + (p.barcode || '') + ' ' + attrText(p) : '';
+    var p = prod(l.pid); return p ? p.name + ' ' + (p.code || '') + ' ' + bcText(p) + ' ' + attrText(p) + ' ' + varLabel(l.cl, l.sz) + ' ' + nv(l.cl) + ' ' + nv(l.sz) : '';
   }).join(' ');
   return nz(txt).indexOf(q) >= 0;
 }
@@ -937,25 +1066,66 @@ function prodList(){
   var q = nz(state.q.products);
   var list = db.products.filter(function(p){
     if(!q) return true;
-    return nz(p.name + ' ' + (p.code || '') + ' ' + (p.barcode || '') + ' ' + attrText(p)).indexOf(q) >= 0;
+    return nz(p.name + ' ' + (p.code || '') + ' ' + bcText(p) + ' ' + attrText(p)).indexOf(q) >= 0;
   }).sort(function(a, b){ return a.name.localeCompare(b.name, 'tr'); });
   if(!list.length) return '<div class="empty">' + (db.products.length ? 'Aramanıza uyan ürün yok.' : 'Henüz ürün kartı yok. Sağ üstten ilk ürününüzü ekleyin.') + '</div>';
   return '<div class="tbl"><table><thead><tr><th>Ürün</th><th>Kod / barkod</th>' + (can('cost') ? '<th class="r">Alış</th>' : '') + '<th class="r">Perakende</th><th class="r">Toptan</th><th class="r">KDV</th><th class="r">Stok</th><th></th></tr></thead><tbody>' +
     list.map(function(p){
       var s = stockOf(p.id), low = p.min > 0 && s <= p.min, tg = attrTags(p);
-      return '<tr><td><b>' + esc(p.name) + '</b>' + (tg ? '<div style="margin-top:3px">' + tg + '</div>' : '') + '</td><td class="muted">' + esc(p.code || '') + (p.barcode ? '<div>' + esc(p.barcode) + '</div>' : '') + '</td>' +
+      return '<tr><td><b>' + esc(p.name) + '</b>' + (hasVar(p) ? '<div class="muted" style="font-size:12px;margin-top:2px">' + esc(varSummary(p)) + '</div>' : '') + (tg ? '<div style="margin-top:3px">' + tg + '</div>' : '') + '</td><td class="muted">' + esc(p.code || '') + (p.barcode ? '<div>' + esc(p.barcode) + '</div>' : '') + (hasVbc(p) ? '<div style="font-size:12px">' + Object.keys(vbcOf(p)).length + ' varyant barkodu</div>' : '') + '</td>' +
         (can('cost') ? '<td class="r">' + money(p.cost) + '</td>' : '') + '<td class="r">' + money(p.price) + '</td><td class="r">' + (p.wprice > 0 ? money(p.wprice) : '<span class="muted">—</span>') + '</td><td class="r">%' + pv(p) + '</td><td class="r"><span class="tag ' + (s <= 0 ? 'bad' : low ? 'warn' : 'move') + '">' + qf(s) + ' ' + esc(p.unit) + '</span></td>' +
-        '<td class="r">' + ((can('products.labels') && p.barcode ? '<button class="btn sm" data-act="label" data-id="' + p.id + '">Etiket</button> ' : '') + (can('products.edit') ? '<button class="btn sm" data-act="editProduct" data-id="' + p.id + '">Düzenle</button> ' : '') + (can('products.delete') ? '<button class="btn sm danger" data-act="delProduct" data-id="' + p.id + '">Sil</button>' : '')) + '</td></tr>';
+        '<td class="r">' + ((can('products.labels') && (p.barcode || hasVbc(p)) ? '<button class="btn sm" data-act="label" data-id="' + p.id + '">Etiket</button> ' : '') + (can('products.edit') ? '<button class="btn sm" data-act="editProduct" data-id="' + p.id + '">Düzenle</button> ' : '') + (can('products.delete') ? '<button class="btn sm danger" data-act="delProduct" data-id="' + p.id + '">Sil</button>' : '')) + '</td></tr>';
     }).join('') + '</tbody></table></div>';
 }
 V.products = function(){
   return '<div class="bar"><h2>Ürün kartları</h2><span class="spacer"></span><input class="search" type="search" placeholder="Ürün adı, kod, barkod veya özellik ara" value="' + esc(state.q.products) + '" data-q="products">' + (can('products.import') ? '<button class="btn" data-act="impExcel">Excel’den aktar</button>' : '') + (can('products.labels') ? '<button class="btn" data-act="bulkBarcode">Toplu barkod</button><button class="btn" data-act="batchLabels">Toplu etiket</button>' : '') + (can('products.edit') ? '<button class="btn pri" data-act="newProduct">+ Yeni ürün</button>' : '') + '</div><div id="list">' + prodList() + '</div>';
 };
+function vgridHtml(p, colors, sizes){
+  if(!colors.length && !sizes.length) return '';
+  var rows = colors.length ? colors : [''], cols = sizes.length ? sizes : [''], m = vbcOf(p);
+  var head = '<tr><th>' + (colors.length ? 'Renk' : '') + (colors.length && sizes.length ? ' \\ ' : '') + (sizes.length ? 'Beden' : '') + '</th>' + cols.map(function(c){ return '<th class="r">' + esc(c ? catLabel('size', c) : '—') + '</th>'; }).join('') + '</tr>';
+  var body = rows.map(function(r){
+    return '<tr><td><b>' + esc(r ? catLabel('color', r) : '—') + '</b></td>' + cols.map(function(c){
+      return p ? '<td class="r">' + qf(stockV(p.id, r, c)) + '</td>' : '<td class="r"><input class="cpi" type="number" min="0" step="any" name="vs:' + esc(r) + '|' + esc(c) + '" placeholder="0"></td>';
+    }).join('') + '</tr>';
+  }).join('');
+  var bcs = '<div class="muted" style="font-size:12px;margin:10px 0 4px">Varyant barkodları (isteğe bağlı). Her renk ve beden için ayrı barkod verirseniz satışta okutunca renk ve beden kendiliğinden seçilir, etiket de varyant başına basılır.</div>' +
+    '<div class="pickbar" style="margin-bottom:4px"><button type="button" class="btn sm" data-act="vbAuto">Boş olanlara otomatik EAN-13 ver</button></div>' +
+    '<div class="tbl cpbox"><table><thead><tr><th>Varyant</th><th>Barkod</th></tr></thead><tbody>' + rows.map(function(r){
+      return cols.map(function(c){ var k = vkeyOf(r, c); return '<tr><td>' + esc(varLabel(r, c)) + '</td><td><input class="vbi" name="vb:' + esc(k) + '" inputmode="numeric" autocomplete="off" placeholder="Okutun veya yazın" value="' + esc(m[k] || '') + '"></td></tr>'; }).join('');
+    }).join('') + '</tbody></table></div>';
+  return '<div class="muted" style="font-size:12px;margin-bottom:4px">' + (p ? 'Mevcut stok (renk ve beden bazında). Stoğu değiştirmek için Stok sekmesini kullanın.' : 'Açılış stoğu (renk ve beden bazında, boş = 0)') + '</div><div class="tbl"><table><thead>' + head + '</thead><tbody>' + body + '</tbody></table></div>' + bcs;
+}
+function selCodes(f, pf, kind){
+  var out = []; f.querySelectorAll('input[name^="' + pf + '"]:checked').forEach(function(i){ out.push(i.name.slice(pf.length)); });
+  return catSort(kind, out);
+}
+function varPick(kind, cur){
+  var arr = varCat(kind), nm = kind === 'color' ? 'Renkler' : 'Bedenler', pf = kind === 'color' ? 'col:' : 'siz:', one = kind === 'color' ? 'renk' : 'beden';
+  var has = function(c){ return cur.some(function(x){ return lk(x) === lk(c); }); };
+  var boxes = arr.map(function(x){
+    return '<label class="chk pk"><input type="checkbox" name="' + pf + esc(x.c) + '" data-vg="1"' + (has(x.c) ? ' checked' : '') + '> <span>' + esc(x.d || x.c) + (x.d && x.d !== x.c ? ' <span class="muted">· ' + esc(x.c) + '</span>' : '') + '</span></label>';
+  }).join('');
+  var quick = can('attrs.edit') ? '<details class="cpdet"><summary>Listede yok mu? Yeni ' + one + ' ekle</summary><div class="cols">' + fld('Kod', '<input id="qk_' + kind + '_c" maxlength="40" placeholder="' + (kind === 'color' ? 'Örn. KRM' : 'Örn. XL') + '" autocomplete="off">') + fld('Açıklama', '<input id="qk_' + kind + '_d" maxlength="80" placeholder="' + (kind === 'color' ? 'Örn. Kırmızı' : 'Örn. Çok büyük') + '" autocomplete="off">') + '</div><button type="button" class="btn sm" data-act="catQuick" data-kind="' + kind + '">Ekle ve seç</button></details>' : '';
+  return '<div class="varpick" id="vp_' + kind + '"><div class="pgt">' + nm + '</div>' + (arr.length ? '<div class="pick sm vp">' + boxes + '</div>' : '<div class="muted" style="font-size:13px">Henüz ' + one + ' tanımı yok.' + (can('attrs.edit') ? '' : ' Özellikler sekmesinde tanımlanması için yöneticiye başvurun.') + '</div>') + quick + '</div>';
+}
+function vgRefresh(){
+  var f = $('#mf'), g = $('#vgrid'); if(!f || !g) return;
+  var keep = {}; g.querySelectorAll('input[name^="vs:"],input[name^="vb:"]').forEach(function(i){ if(i.name.indexOf('vb:') === 0 || i.value !== '') keep[i.name] = i.value; });
+  var p = g.dataset.pid ? prod(g.dataset.pid) : null, cs = selCodes(f, 'col:', 'color'), ss = selCodes(f, 'siz:', 'size');
+  g.innerHTML = vgridHtml(p, cs, ss);
+  g.querySelectorAll('input[name^="vs:"],input[name^="vb:"]').forEach(function(i){ if(keep[i.name] !== undefined) i.value = keep[i.name]; });
+  var ow = $('#openwrap'); if(ow) ow.hidden = !!(cs.length || ss.length);
+}
 function productForm(id){
   var p = id ? prod(id) : null;
   var units = ['adet', 'kg', 'gr', 'lt', 'metre', 'koli', 'paket', 'çift'];
   var names = attrNames(), at = (p && p.attrs) || [];
   var anyVals = false;
+  var curC = p && Array.isArray(p.colors) ? p.colors : [], curS = p && Array.isArray(p.sizes) ? p.sizes : [];
+  var varBlock = '<h3 style="font-size:14px;margin:6px 0 8px">Renk ve beden (isteğe bağlı)</h3>' + varPick('color', curC) + varPick('size', curS) +
+    '<div class="muted" style="font-size:12px;margin:-2px 0 8px">Seçenekler Özellikler sekmesindeki Renkler ve Bedenler listesinden gelir. İşaretlerseniz stok her renk ve beden için ayrı tutulur, satış ve alışta seçtirilir. Hiçbirini işaretlemezseniz ürün tek kalem olur.</div>' +
+    '<div id="vgrid"' + (p ? ' data-pid="' + p.id + '"' : '') + '>' + vgridHtml(p, catSort('color', curC), catSort('size', curS)) + '</div>';
   var attrFields = names.map(function(n, i){
     if(!n) return '';
     var vals = attrVals(i).slice().sort(function(a, b){ return a.c.localeCompare(b.c, 'tr'); }), cu = at[i] || '';
@@ -977,8 +1147,8 @@ function productForm(id){
       fld('Toptan fiyatı (KDV dahil ₺)', '<input name="wprice" type="number" step="any" min="0" value="' + (p && p.wprice > 0 ? p.wprice : '') + '" placeholder="Boşsa perakende">') +
       fld('KDV oranı', '<select name="vat">' + vatOpts(p ? pv(p) : 20) + '</select>') +
       fld('Kritik stok seviyesi', '<input name="min" type="number" step="any" min="0" value="' + (p ? p.min : '') + '" placeholder="0 = uyarı yok">') +
-      (p ? fld('Mevcut stok', '<input value="' + qf(stockOf(p.id)) + '" disabled>') : fld('Açılış stoğu', '<input name="open" type="number" step="any" min="0" placeholder="0">')) +
-    '</div>' + (attrFields ? '<h3 style="font-size:14px;margin:6px 0 8px">Özellikler</h3><div class="cols">' + attrFields + '</div>' + (anyVals ? '' : '<div class="hint">Seçenekler boş. Özellik değerlerini Özellikler sekmesinden tanımlayın.</div>') : '') +
+      (p ? fld('Mevcut stok', '<input value="' + qf(stockOf(p.id)) + '" disabled>') : '<div id="openwrap">' + fld('Açılış stoğu', '<input name="open" type="number" step="any" min="0" placeholder="0">') + '</div>') +
+    '</div>' + varBlock + (attrFields ? '<h3 style="font-size:14px;margin:6px 0 8px">Özellikler</h3><div class="cols">' + attrFields + '</div>' + (anyVals ? '' : '<div class="hint">Seçenekler boş. Özellik değerlerini Özellikler sekmesinden tanımlayın.</div>') : '') +
     (p ? '<div class="hint">Stoğu değiştirmek için Stok sekmesinden giriş veya çıkış yapın.</div>' : ''),
     function(f){
       var name = (f.name || '').trim();
@@ -986,15 +1156,54 @@ function productForm(id){
       var bc = (f.barcode || '').trim();
       if(bc){
         if(/^\d{13}$/.test(bc) && ean13Check(bc.slice(0, 12)) !== +bc[12]){ toast('EAN-13 kontrol hanesi hatalı. Doğrusu: ' + bc.slice(0, 12) + ean13Check(bc.slice(0, 12)), 'err'); return false; }
-        if(db.products.some(function(x){ return x.barcode === bc && (!p || x.id !== p.id); })){ toast('Bu barkod başka bir üründe kullanılıyor', 'err'); return false; }
+        if(barcodeTaken(bc, p ? p.id : null)){ toast('Bu barkod başka bir üründe kullanılıyor', 'err'); return false; }
       }
       var attrs = names.map(function(n, i){ return (f['a' + i] || '').trim(); });
+      var pickOf = function(pf, kind, cur){
+        var out = Object.keys(f).filter(function(k){ return k.indexOf(pf) === 0; }).map(function(k){ return k.slice(pf.length); });
+        return catSort(kind, out).map(function(c){ return pickSpell(cur, c); });       // ürünün mevcut yazımı korunur
+      };
+      var cl2 = pickOf('col:', 'color', (p && p.colors) || []), sz2 = pickOf('siz:', 'size', (p && p.sizes) || []);
+      var vbc = {}, vtyped = [], vbBad = null;
+      if(cl2.length || sz2.length){
+        Object.keys(f).forEach(function(k){
+          if(k.indexOf('vb:') !== 0 || vbBad) return;
+          var v = String(f[k] || '').trim().replace(/\s/g, ''); if(!v) return;
+          var key = k.slice(3), ab = key.split('|');
+          if((ab[0] && cl2.indexOf(ab[0]) < 0) || (ab[1] && sz2.indexOf(ab[1]) < 0)) return;
+          var lab = varLabel(ab[0], ab[1]);
+          if(/^\d{13}$/.test(v) && ean13Check(v.slice(0, 12)) !== +v[12]){ vbBad = 'Varyant barkodu (' + lab + ') EAN-13 kontrol hanesi hatalı. Doğrusu: ' + v.slice(0, 12) + ean13Check(v.slice(0, 12)); return; }
+          if(v === bc || vtyped.indexOf(v) >= 0){ vbBad = 'Aynı barkod birden çok yerde yazılmış: ' + v; return; }
+          if(barcodeTaken(v, p ? p.id : null)){ vbBad = 'Varyant barkodu (' + lab + ') başka bir üründe kullanılıyor: ' + v; return; }
+          vtyped.push(v); vbc[key] = v;
+        });
+      }
+      if(vbBad){ toast(vbBad, 'err'); return false; }
+      if(p){
+        var vb0 = vbits(p), vbad = null;
+        vb0.c.forEach(function(c){ if(!vbad && cl2.indexOf(c) < 0 && varUsed(p, 'cl', c)) vbad = '“' + catLabel('color', c) + '” rengi için stok hareketi veya belge var, işareti kaldırılamaz'; });
+        vb0.s.forEach(function(z){ if(!vbad && sz2.indexOf(z) < 0 && varUsed(p, 'sz', z)) vbad = '“' + catLabel('size', z) + '” bedeni için stok hareketi veya belge var, işareti kaldırılamaz'; });
+        if(vbad){ toast(vbad, 'err'); return false; }
+        if(cl2.length) p.colors = cl2; else delete p.colors;
+        if(sz2.length) p.sizes = sz2; else delete p.sizes;
+        if(Object.keys(vbc).length) p.vbc = vbc; else delete p.vbc;
+      }
       if(p){ p.name = name; p.code = f.code.trim(); p.barcode = bc; p.unit = f.unit; p.cost = num(f.cost); p.price = num(f.price); if(num(f.wprice) > 0) p.wprice = num(f.wprice); else delete p.wprice; p.min = num(f.min); p.vat = num(f.vat); p.attrs = attrs; }
       else {
         var np = {id:uid(), name:name, code:f.code.trim(), barcode:bc, unit:f.unit, cost:num(f.cost), price:num(f.price), min:num(f.min), vat:num(f.vat), attrs:attrs, created:today()};
         if(num(f.wprice) > 0) np.wprice = num(f.wprice);
+        if(cl2.length) np.colors = cl2;
+        if(sz2.length) np.sizes = sz2;
+        if(Object.keys(vbc).length) np.vbc = vbc;
         db.products.push(np);
-        if(num(f.open) > 0) db.moves.push({id:uid(), pid:np.id, qty:num(f.open), date:today(), reason:'Açılış stoğu', ts:Date.now()});
+        if(cl2.length || sz2.length){
+          Object.keys(f).forEach(function(k){
+            if(k.indexOf('vs:') !== 0 || !(num(f[k]) > 0)) return;
+            var ab = k.slice(3).split('|'), mv = {id:uid(), pid:np.id, qty:num(f[k]), date:today(), reason:'Açılış stoğu', ts:Date.now()};
+            if(ab[0]) mv.cl = ab[0]; if(ab[1]) mv.sz = ab[1];
+            db.moves.push(mv);
+          });
+        } else if(num(f.open) > 0) db.moves.push({id:uid(), pid:np.id, qty:num(f.open), date:today(), reason:'Açılış stoğu', ts:Date.now()});
       }
       commit(); toast('Ürün kaydedildi');
     });
@@ -1004,7 +1213,7 @@ function productForm(id){
 /* Stok: arama + özellik/durum süzgeçleri (ürün listesi ve hareketler birlikte süzülür) */
 function stockMatch(p){
   var f = state.sq, q = nz(f.q);
-  if(q && nz(p.name + ' ' + (p.code || '') + ' ' + (p.barcode || '') + ' ' + attrText(p)).indexOf(q) < 0) return false;
+  if(q && nz(p.name + ' ' + (p.code || '') + ' ' + bcText(p) + ' ' + attrText(p)).indexOf(q) < 0) return false;
   for(var i = 0; i < 5; i++){ if(f.attrs[i] && (p.attrs || [])[i] !== f.attrs[i]) return false; }
   if(f.st){
     var s = stockOf(p.id);
@@ -1026,7 +1235,7 @@ function stockFilters(){
 }
 function stockSub(p){
   var bits = [p.code, p.barcode].filter(Boolean).map(esc).join(' · '), tg = attrTags(p);
-  return (bits ? '<div class="muted" style="font-size:12px">' + bits + '</div>' : '') + (tg ? '<div style="margin-top:2px">' + tg + '</div>' : '');
+  return (bits ? '<div class="muted" style="font-size:12px">' + bits + '</div>' : '') + (hasVar(p) ? '<div class="muted" style="font-size:12px">' + esc(varSummary(p)) + ' <button type="button" class="btn sm" data-act="varStock" data-id="' + p.id + '">Varyant stokları</button></div>' : '') + (tg ? '<div style="margin-top:2px">' + tg + '</div>' : '');
 }
 function stockTable(){
   if(!db.products.length) return '<div class="empty">Önce ürün kartı açın.</div>';
@@ -1046,7 +1255,7 @@ function stockMoves(){
   if(!shown.length) return '<div class="empty">' + (on ? 'Aramanıza uyan hareket yok.' : 'Hareket yok.') + '</div>';
   return '<div class="tbl"><table><thead><tr><th>Tarih</th><th>Ürün</th><th>Neden</th><th class="r">Miktar</th><th></th></tr></thead><tbody>' + shown.map(function(m){
     var p = prod(m.pid);
-    return '<tr><td class="nw">' + fd(m.date) + '</td><td>' + esc(p ? p.name : '(silinmiş ürün)') + (p && (p.code || p.barcode) ? '<div class="muted" style="font-size:12px">' + [p.code, p.barcode].filter(Boolean).map(esc).join(' · ') + '</div>' : '') + '</td><td>' + esc(m.reason) + (m.no ? ' <span class="muted">' + esc(m.no) + '</span>' : '') + (m.note ? ' <span class="muted">· ' + esc(m.note) + '</span>' : '') + (m.by ? ' <span class="muted">· ' + esc(userName(m.by)) + '</span>' : '') + '</td><td class="r ' + (m.qty > 0 ? 'pos' : 'neg') + '">' + (m.qty > 0 ? '+' : '') + qf(m.qty) + '</td><td class="r">' + (m.ref || !can('stock.delete') ? '' : '<button class="btn sm danger" data-act="delMove" data-id="' + m.id + '">Sil</button>') + '</td></tr>';
+    return '<tr><td class="nw">' + fd(m.date) + '</td><td>' + esc(p ? p.name : '(silinmiş ürün)') + (m.cl || m.sz ? ' <span class="tag move">' + esc(varLabel(m.cl, m.sz)) + '</span>' : '') + (p && (p.code || p.barcode) ? '<div class="muted" style="font-size:12px">' + [p.code, p.barcode].filter(Boolean).map(esc).join(' · ') + '</div>' : '') + '</td><td>' + esc(m.reason) + (m.no ? ' <span class="muted">' + esc(m.no) + '</span>' : '') + (m.note ? ' <span class="muted">· ' + esc(m.note) + '</span>' : '') + (m.by ? ' <span class="muted">· ' + esc(userName(m.by)) + '</span>' : '') + '</td><td class="r ' + (m.qty > 0 ? 'pos' : 'neg') + '">' + (m.qty > 0 ? '+' : '') + qf(m.qty) + '</td><td class="r">' + (m.ref || !can('stock.delete') ? '' : '<button class="btn sm danger" data-act="delMove" data-id="' + m.id + '">Sil</button>') + '</td></tr>';
   }).join('') + '</tbody></table></div>' + (mv.length > shown.length ? '<div class="muted">İlk 100 hareket gösteriliyor, toplam ' + mv.length + ' hareket var. Aramayı daraltın.</div>' : '');
 }
 function stRefresh(){ var a = $('#stlist'), b = $('#stmoves'); if(a) a.innerHTML = stockTable(); if(b) b.innerHTML = stockMoves(); }
@@ -1057,11 +1266,19 @@ V.stock = function(){
   '<div class="bar" style="margin-top:6px"><h3 style="margin:0">Stok hareketleri</h3></div><div id="stmoves">' + stockMoves() + '</div>';
 };
 
+function svHtml(p){
+  if(!p || !hasVar(p)) return '';
+  var vb = vbits(p), un = Math.abs(stockV(p.id, '', '')) > 0.0001, h = '<div class="cols">';
+  if(vb.c.length) h += fld('Renk', '<select name="cl"><option value="">' + (un ? '(atanmamış stok)' : '— seçin —') + '</option>' + vb.c.map(function(c){ return '<option value="' + esc(c) + '">' + esc(catLabel('color', c)) + '</option>'; }).join('') + '</select>');
+  if(vb.s.length) h += fld('Beden', '<select name="sz"><option value="">' + (un ? '(atanmamış stok)' : '— seçin —') + '</option>' + vb.s.map(function(z){ return '<option value="' + esc(z) + '">' + esc(catLabel('size', z)) + '</option>'; }).join('') + '</select>');
+  return h + '</div>' + (un ? '<div class="muted" style="font-size:12px;margin:-4px 0 8px">Renk/beden atanmamış stok var. Seçim yapmazsanız bu stoğa işlenir.</div>' : '');
+}
 function stockForm(dir, pid){
   if(!db.products.length){ toast('Önce ürün kartı açın', 'err'); return; }
   var reasons = ['Sayım farkı','Fire / zayiat','Hasar','İade','Düzeltme','Diğer'];
   modal('Elle stok hareketi',
     fld('Ürün', '<select name="pid" required>' + db.products.map(function(p){ return '<option value="' + p.id + '"' + (p.id === pid ? ' selected' : '') + '>' + esc(p.name) + ' (stok ' + qf(stockOf(p.id)) + ')</option>'; }).join('') + '</select>') +
+    '<div id="svsel">' + svHtml(prod(pid || db.products[0].id)) + '</div>' +
     '<div class="cols">' +
       fld('Yön', '<select name="dir"><option value="in"' + (dir === 'in' ? ' selected' : '') + '>Giriş (+)</option><option value="out"' + (dir === 'out' ? ' selected' : '') + '>Çıkış (−)</option></select>') +
       fld('Miktar', '<input name="qty" type="number" step="any" min="0" required>') +
@@ -1071,7 +1288,14 @@ function stockForm(dir, pid){
     function(f){
       var q = num(f.qty);
       if(q <= 0){ toast('Miktar girin', 'err'); return false; }
-      db.moves.push({id:uid(), pid:f.pid, qty:f.dir === 'in' ? q : -q, date:f.date || today(), reason:f.reason, note:f.note.trim(), by:(cur() || {}).id || '', ts:Date.now()});
+      var p = prod(f.pid), cl = f.cl || '', sz = f.sz || '';
+      if(p && hasVar(p)){
+        var vb = vbits(p), none = !cl && !sz;
+        if(none ? !(Math.abs(stockV(p.id, '', '')) > 0.0001) : ((vb.c.length && !cl) || (vb.s.length && !sz))){ toast('Renk ve beden seçin', 'err'); return false; }
+      } else { cl = ''; sz = ''; }
+      var mv = {id:uid(), pid:f.pid, qty:f.dir === 'in' ? q : -q, date:f.date || today(), reason:f.reason, note:f.note.trim(), by:(cur() || {}).id || '', ts:Date.now()};
+      if(cl) mv.cl = cl; if(sz) mv.sz = sz;
+      db.moves.push(mv);
       commit(); toast('Stok hareketi kaydedildi');
     });
 }
@@ -1144,13 +1368,13 @@ function cariPriceForm(id){
     '<div class="hint">Bu cariye satış yaparken fiyat şu sırayla belirlenir: önce aşağıda girilen <b>özel fiyat</b>; yoksa seçilen <b>fiyat türü</b> (toptan fiyatı olmayan ürünlerde perakende); hiçbiri yoksa <b>perakende fiyat</b>. Satış ekranında satır fiyatını elle değiştirebilirsiniz.</div>' + cpFields(c, false),
     function(f){ cpApply(c, f); commit(); toast('Fiyat tanımları kaydedildi'); });
 }
-function cariForm(id, after){
-  var c = id ? cari(id) : null;
+function cariForm(id, after, defType){
+  var c = id ? cari(id) : null, ty0 = c ? c.type : (defType || 'musteri');
   var open = c ? c.open || 0 : 0;
   modal(c ? 'Cariyi düzenle' : 'Yeni cari',
     fld('Cari adı', '<input name="name" required value="' + esc(c ? c.name : '') + '">') +
     '<div class="cols">' +
-      fld('Tür', '<select name="type"><option value="musteri"' + (c && c.type === 'musteri' ? ' selected' : '') + '>Müşteri</option><option value="tedarikci"' + (c && c.type === 'tedarikci' ? ' selected' : '') + '>Tedarikçi</option><option value="ikisi"' + (c && c.type === 'ikisi' ? ' selected' : '') + '>Her ikisi</option></select>') +
+      fld('Tür', '<select name="type"><option value="musteri"' + (ty0 === 'musteri' ? ' selected' : '') + '>Müşteri</option><option value="tedarikci"' + (ty0 === 'tedarikci' ? ' selected' : '') + '>Tedarikçi</option><option value="ikisi"' + (ty0 === 'ikisi' ? ' selected' : '') + '>Her ikisi</option></select>') +
       fld('Telefon', '<input name="phone" value="' + esc(c ? c.phone : '') + '">') +
       fld('Devir bakiyesi (₺)', '<input name="open" type="number" step="any" min="0" value="' + (open ? Math.abs(open) : '') + '" placeholder="0">') +
       fld('Devir yönü', '<select name="odir"><option value="1"' + (open >= 0 ? ' selected' : '') + '>Cari bize borçlu (alacak)</option><option value="-1"' + (open < 0 ? ' selected' : '') + '>Biz cariye borçluyuz</option></select>') +
@@ -1350,7 +1574,7 @@ V.settings = function(){
     fld('Adres', '<input id="s_addr" value="' + esc(db.settings.address) + '">') +
     fld('Vergi dairesi / no', '<input id="s_tax" value="' + esc(db.settings.taxNo) + '">') +
     '</div>' +
-    '<button class="btn pri" data-act="saveName">Kaydet</button></div>' + logoCard() + rcCard() + lblCard() + menusCard() : '') +
+    '<button class="btn pri" data-act="saveName">Kaydet</button></div>' + logoCard() + rcCard() + lblCard() + eanCard() + menusCard() : '') +
   (adm ? usersCard() : '') +
   (adm ? '<div class="card"><h3>Yedekleme</h3><p class="muted" style="margin-top:0">' + (SRV ? 'Veriler sunucudaki SQL Server veritabanında saklanır. Buradan indirilen dosya, ekrandaki verilerin bir kopyasıdır (şifreler dahil değildir). Veritabanı yedeği için sunucudaki yedek betiğini kullanın.' : 'Veriler bu tarayıcıda saklanır. Tarayıcı verisini temizlerseniz silinir; bu yüzden düzenli olarak yedek alın. Yedek kullanıcıları ve şifre özetlerini de içerir, güvenli bir yerde saklayın.') + '</p>' +
     '<div class="row-end" style="justify-content:flex-start;margin-bottom:10px"><button class="btn" data-act="downloadBackup">Yedek dosyası indir</button><button class="btn" data-act="exportData">Yedek metni oluştur</button>' + (SRV ? '' : '<label class="btn" style="cursor:pointer;margin:0">Dosyadan geri yükle<input type="file" id="bkfile" accept=".json,application/json,text/plain" style="display:none"></label><button class="btn" data-act="importData">Kutudaki metinden geri yükle</button>') + '</div>' +
@@ -1402,11 +1626,84 @@ A.newDoc = function(d){
   render();
 };
 A.cancelDoc = function(d){ state.ed[d.type] = null; render(); };
+A.addCat = function(d){ catForm(d.kind, null); };
+A.editCat = function(d){ catForm(d.kind, +d.k); };
+A.moveCat = function(d){
+  var arr = varCat(d.kind), k = +d.k, j = k + (+d.dir);
+  if(j < 0 || j >= arr.length) return;
+  var t = arr[k]; arr[k] = arr[j]; arr[j] = t; commit();
+};
+A.delCat = function(d){
+  var arr = varCat(d.kind), k = +d.k, v = arr[k]; if(!v) return;
+  var np = catUsedProducts(d.kind, v.c);
+  if(np){ toast('“' + v.d + '” ' + np + ' üründe işaretli, önce ürünlerden kaldırın', 'err'); return; }
+  if(catUsedHard(d.kind, v.c)){ toast('“' + v.d + '” belge veya stok hareketlerinde kullanılmış, silinemez', 'err'); return; }
+  confirmBox('“' + v.d + '” silinecek.', function(){ arr.splice(k, 1); commit(); toast('Silindi'); });
+};
+A.catQuick = function(d){                                         // ürün kartından çıkmadan yeni renk/beden ekle ve seç
+  var f = $('#mf'), kind = d.kind; if(!f) return;
+  var ci = $('#qk_' + kind + '_c'), di = $('#qk_' + kind + '_d');
+  var r = catAddOne(kind, {c:ci ? ci.value : '', d:di ? di.value : ''});
+  if(r.err){ toast(r.err, 'err'); return; }
+  var pf = kind === 'color' ? 'col:' : 'siz:', cur = selCodes(f, pf, kind); cur.push(r.code);
+  var box = $('#vp_' + kind); if(box) box.outerHTML = varPick(kind, cur);
+  commit(); vgRefresh(); toast('Eklendi ve seçildi');
+};
+A.vbAuto = function(){
+  var f = $('#mf'); if(!f) return;
+  var typed = [], mb = f.elements.barcode ? f.elements.barcode.value.trim() : ''; if(mb) typed.push(mb);
+  f.querySelectorAll('input[name^="vb:"]').forEach(function(i){ if(i.value.trim()) typed.push(i.value.trim()); });
+  var n = 0;
+  f.querySelectorAll('input[name^="vb:"]').forEach(function(i){ if(i.value.trim()) return; var b = nextEan(typed); if(!b) return; i.value = b; typed.push(b); n++; });
+  toast(n ? n + ' varyanta barkod verildi' : 'Tüm varyantların barkodu dolu');
+};
+A.varStock = function(d){
+  var p = prod(d.id); if(!p || !hasVar(p)) return;
+  var vb = vbits(p), cols = vb.s.length ? vb.s : [''], rows = vb.c.length ? vb.c : [''];
+  var tot = stockOf(p.id), assigned = 0, colT = cols.map(function(){ return 0; });
+  var body = rows.map(function(r){
+    var rt = 0;
+    var cells = cols.map(function(c, ci){ var q = stockV(p.id, r, c); rt += q; colT[ci] += q; return '<td class="r ' + (q < 0 ? 'neg' : q === 0 ? 'muted' : '') + '">' + qf(q) + '</td>'; }).join('');
+    assigned += rt;
+    return '<tr><td><b>' + esc(r ? catLabel('color', r) : '—') + '</b></td>' + cells + '<td class="r"><b>' + qf(rt) + '</b></td></tr>';
+  }).join('');
+  var un = r2(tot - assigned);
+  modal('Varyant stokları · ' + p.name,
+    '<div class="tbl"><table><thead><tr><th>' + (vb.c.length ? 'Renk' : '') + (vb.c.length && vb.s.length ? ' \\ ' : '') + (vb.s.length ? 'Beden' : '') + '</th>' + cols.map(function(c){ return '<th class="r">' + esc(c ? catLabel('size', c) : '—') + '</th>'; }).join('') + '<th class="r">Toplam</th></tr></thead><tbody>' + body +
+    '<tr><td><b>Toplam</b></td>' + colT.map(function(q){ return '<td class="r"><b>' + qf(q) + '</b></td>'; }).join('') + '<td class="r"><b>' + qf(assigned) + '</b></td></tr></tbody></table></div>' +
+    (Math.abs(un) > 0.0001 ? '<div class="hint">Renk/beden atanmamış stok: <b>' + qf(un) + ' ' + esc(p.unit) + '</b>. Bu stoğu bir renk ve bedene taşımak için Stok sekmesinden, renk ve beden seçmeden çıkış, ardından seçerek giriş yapın.</div>' : '') +
+    '<div class="muted">Ürünün toplam stoğu: ' + qf(tot) + ' ' + esc(p.unit) + '</div>', null, null, '', true);
+};
+A.vgrid = function(d){
+  var type = d.type, ed = state.ed[type], i = +d.i, l = ed && ed.lines[i], p = l && prod(l.pid);
+  if(!p || !hasVar(p)) return;
+  var vb = vbits(p), cols = vb.s.length ? vb.s : [''], rows = vb.c.length ? vb.c : [''], cur0 = {};
+  ed.lines.forEach(function(x){ if(x.pid === p.id) cur0[nv(x.cl) + '|' + nv(x.sz)] = (cur0[nv(x.cl) + '|' + nv(x.sz)] || 0) + num(x.qty); });
+  var showSt = TYPES[type].stock < 0;
+  modal('Renk / beden dağılımı · ' + p.name,
+    '<div class="hint">Her renk ve beden için adet girin. Boş veya 0 olanlar eklenmez. Bu ürünün editördeki satırları bu tabloyla değiştirilir.' + (showSt ? ' Gri rakamlar mevcut stoktur.' : '') + '</div>' +
+    '<div class="tbl"><table><thead><tr><th>' + (vb.c.length ? 'Renk' : '') + (vb.c.length && vb.s.length ? ' \\ ' : '') + (vb.s.length ? 'Beden' : '') + '</th>' + cols.map(function(c){ return '<th class="r">' + esc(c ? catLabel('size', c) : '—') + '</th>'; }).join('') + '</tr></thead><tbody>' +
+    rows.map(function(r){ return '<tr><td><b>' + esc(r ? catLabel('color', r) : '—') + '</b></td>' + cols.map(function(c){ var v = cur0[r + '|' + c]; return '<td class="r"><input class="cpi" type="number" min="0" step="any" name="vq:' + esc(r) + '|' + esc(c) + '" value="' + (v ? esc(v) : '') + '" placeholder="' + (showSt ? qf(stockV(p.id, r, c)) : '0') + '"></td>'; }).join('') + '</tr>'; }).join('') + '</tbody></table></div>',
+    function(f){
+      var add = [];
+      Object.keys(f).forEach(function(k){
+        if(k.indexOf('vq:') !== 0 || !(num(f[k]) > 0)) return;
+        var ab = k.slice(3).split('|'), row = {pid:p.id, qty:String(num(f[k])), price:l.price, pm:l.pm, noCamp:l.noCamp, disc:l.disc ? {t:l.disc.t, v:l.disc.v} : null};
+        if(ab[0]) row.cl = ab[0]; if(ab[1]) row.sz = ab[1];
+        add.push(row);
+      });
+      var first = ed.lines.findIndex(function(x){ return x.pid === p.id; });
+      ed.lines = ed.lines.filter(function(x){ return x.pid !== p.id; });
+      ed.lines.splice(Math.min(first < 0 ? ed.lines.length : first, ed.lines.length), 0, ...add);
+      if(!ed.lines.length) ed.lines.push({pid:'', qty:1, price:''});
+      render();
+    });
+};
 A.addLine = function(d){ state.ed[d.type].lines.push({pid:'', qty:1, price:''}); render(); };
 A.rmLine = function(d){ var ed = state.ed[d.type]; ed.lines.splice(+d.i, 1); if(!ed.lines.length) ed.lines.push({pid:'', qty:1, price:''}); render(); };
 A.payAll = function(d){ var ed = state.ed[d.type]; ed.pm = d.m; updateTotals(d.type); };
 A.credit = function(d){ var ed = state.ed[d.type]; ed.pm = null; ed.pay = {n:'', k:'', h:''}; ['n', 'k', 'h'].forEach(function(k){ var i = $('#p_' + k); if(i) i.value = ''; }); updateTotals(d.type); };
-A.quickCari = function(d){ cariForm(null, function(c){ var ed = state.ed[d.type]; ed.cariId = c.id; var rn = reprice(d.type, ed); if(rn) toast(rn + ' satırın fiyatı güncellendi'); render(); }); };
+A.quickCari = function(d){ cariForm(null, function(c){ var ed = state.ed[d.type]; ed.cariId = c.id; var rn = reprice(d.type, ed); if(rn) toast(rn + ' satırın fiyatı güncellendi'); render(); }, TYPES[d.type].sellSide ? 'musteri' : 'tedarikci'); };
 A.saveDoc = async function(d){
   var type = d.type, ed = state.ed[type];
   if(!can(DOC_PERM[type])){ toast('Bu işlem için yetkiniz yok', 'err'); return; }
@@ -1414,6 +1711,18 @@ A.saveDoc = async function(d){
     if(!can('sales.discount')){ ed.lines.forEach(function(l){ l.disc = null; }); ed.docDisc = null; }
     if(!can('sales.price')){ ed.lines.forEach(function(l){ var p0 = prod(l.pid); if(p0) l.price = unitPrice(p0, ed.cariId, ed.pk); }); }
   }
+  var vbad = null;
+  ed.lines.forEach(function(l, i){
+    if(vbad || !l.pid || !(num(l.qty) > 0)) return;
+    var p = prod(l.pid); if(!p) return;
+    if(!hasVar(p)){ l.cl = ''; l.sz = ''; return; }
+    var vb = vbits(p), who = 'Satır ' + (i + 1) + ' (' + p.name + '): ';
+    if(vb.c.length && !l.cl) vbad = who + 'renk seçin';
+    else if(vb.s.length && !l.sz) vbad = who + 'beden seçin';
+    else if((vb.c.length && vb.c.indexOf(l.cl) < 0) || (vb.s.length && vb.s.indexOf(l.sz) < 0)) vbad = who + 'renk veya beden bu üründe tanımlı değil';
+    else { if(!vb.c.length) l.cl = ''; if(!vb.s.length) l.sz = ''; }
+  });
+  if(vbad){ toast(vbad, 'err'); return; }
   var pr = edPricing(type, ed);
   syncPay(ed, pr.total);
   if(!pr.lines.length){ toast('En az bir ürün ve miktar girin', 'err'); return; }
@@ -1425,9 +1734,9 @@ A.saveDoc = async function(d){
   if(!ed.cariId && paid < total - 0.004){ toast('Cari seçmeden kalan tutar bırakılamaz. Cari seçin ya da tamamını ödeme olarak girin.', 'err'); return; }
   if(ed.ref && (type === 'sret' || type === 'pret')){
     var byp = {};
-    pr.lines.forEach(function(l){ byp[l.pid] = (byp[l.pid] || 0) + l.qty; });
-    var bad = Object.keys(byp).find(function(pid){ return byp[pid] > remainingQty(ed.ref, pid) + 0.0001; });
-    if(bad){ toast('İade miktarı kalan iade edilebilir miktarı aşıyor: ' + ((prod(bad) || {}).name || '') + ' (en fazla ' + qf(remainingQty(ed.ref, bad)) + ')', 'err'); return; }
+    pr.lines.forEach(function(l){ var k = vkey(l); byp[k] = (byp[k] || 0) + l.qty; });
+    var bad = Object.keys(byp).find(function(k){ var a = k.split('|'); return byp[k] > remainingQty(ed.ref, a[0], a[1], a[2]) + 0.0001; });
+    if(bad){ var ba = bad.split('|'); toast('İade miktarı kalan iade edilebilir miktarı aşıyor: ' + ((prod(ba[0]) || {}).name || '') + (ba[1] || ba[2] ? ' (' + varLabel(ba[1], ba[2]) + ')' : '') + ' (en fazla ' + qf(remainingQty(ed.ref, ba[0], ba[1], ba[2])) + ')', 'err'); return; }
   }
   var rno = null;
   if(SRV){ try{ rno = (await api('POST', '/api/reserve', {type:type})).no; }catch(e){ if(e.status === 401) srvLogout('Oturum süresi doldu, yeniden giriş yapın'); else toast(e.message || 'Belge numarası alınamadı, bağlantıyı kontrol edin', 'err'); return; } }
@@ -1449,7 +1758,7 @@ A.openDoc = function(d){
     '<div class="hint">' + fd(x.date) + ' · ' + esc(cariName(x.cariId)) + (x.note ? ' · ' + esc(x.note) : '') + (x.by ? ' · ' + esc(userName(x.by)) : '') + (x.refNo ? ' · Bağlı belge: ' + esc(x.refNo) : '') + '</div>' +
     '<div class="tbl"><table><thead><tr><th>Ürün</th><th class="r">Miktar</th><th class="r">Fiyat</th><th class="r">İndirim</th><th class="r">Tutar</th></tr></thead><tbody>' + x.lines.map(function(l){
       var p = prod(l.pid), ld = r2(lg(l) - lt(l));
-      return '<tr><td>' + esc(p ? p.name : '(silinmiş)') + '</td><td class="r">' + qf(l.qty) + ' ' + esc(p ? p.unit : '') + '</td><td class="r">' + money(l.price) + '</td><td class="r">' + (ld > 0.004 ? '−' + money(ld) + (l.camp ? '<div class="muted">' + esc(l.camp) + '</div>' : '') : '') + '</td><td class="r">' + money(lt(l)) + '</td></tr>';
+      return '<tr><td>' + esc(p ? p.name : '(silinmiş)') + (l.cl || l.sz ? '<div class="muted" style="font-size:12px">' + esc(varLabel(l.cl, l.sz)) + '</div>' : '') + '</td><td class="r">' + qf(l.qty) + ' ' + esc(p ? p.unit : '') + '</td><td class="r">' + money(l.price) + '</td><td class="r">' + (ld > 0.004 ? '−' + money(ld) + (l.camp ? '<div class="muted">' + esc(l.camp) + '</div>' : '') : '') + '</td><td class="r">' + money(lt(l)) + '</td></tr>';
     }).join('') + '</tbody></table></div>' +
     lrHtml + '<p style="text-align:right;margin:10px 0 0">' + (disc > 0.004 ? '<span class="muted">Ara toplam ' + money(x.gross) + ' · İndirim −' + money(disc) + '</span><br>' : '') + '<span class="muted">KDV hariç ' + money(vs.net) + ' · KDV ' + money(vs.vat) + '</span><br><b>Toplam ' + money(x.total) + '</b><br><span class="muted">' + TYPES[x.type].paidLabel + ' ' + money(x.paid) + (pm ? ' (' + pm + ')' : '') + '</span> · Kalan ' + money(rest) + '</p>',
     null, null, refBtn + '<button type="button" class="btn" data-act="receipt" data-kind="doc" data-id="' + x.id + '">Fiş yazdır</button>' + (can(DOC_DEL[x.type]) ? '<button type="button" class="btn danger" data-act="delDoc" data-id="' + x.id + '">Sil</button>' : ''), true);
@@ -1587,7 +1896,8 @@ function onEd(e){
     else {
       l[f] = t.value;
       if(f === 'price') l.pm = true;                                // elle girilen fiyat, cari/tür değişince korunur
-      if(f === 'pid'){ var p = prod(t.value); if(p){ l.price = lineDefault(type, ed, p); l.pm = false; } l.noCamp = false; render(); return; }
+      if(f === 'cl' || f === 'sz'){ render(); return; }
+      if(f === 'pid'){ l.cl = ''; l.sz = ''; var p = prod(t.value); if(p){ l.price = lineDefault(type, ed, p); l.pm = false; } l.noCamp = false; render(); return; }
     }
   } else if(f.indexOf('pay_') === 0){
     ed.pay[f.slice(4)] = t.value; ed.pm = null;
@@ -1615,25 +1925,28 @@ document.addEventListener('keydown', function(e){
   var code = t.value.trim(); if(!code) return;
   var type = t.dataset.scan, ed = state.ed[type]; if(!ed) return;
   var lc = code.toLowerCase();
-  var p = db.products.find(function(x){ return (x.barcode && x.barcode.toLowerCase() === lc) || (x.code && x.code.toLowerCase() === lc); });
-  if(!p){ toast('Barkod veya kod bulunamadı: ' + code, 'err'); t.select(); return; }
-  var ex = ed.lines.find(function(l){ return l.pid === p.id; });
+  var hit = findByCode(lc);
+  if(!hit){ toast('Barkod veya kod bulunamadı: ' + code, 'err'); t.select(); return; }
+  var p = hit.p, vh = !!hit.v, hv0 = hasVar(p);
+  var ex = ed.lines.find(function(l){ return l.pid === p.id && (vh ? (nv(l.cl) === hit.cl && nv(l.sz) === hit.sz) : (!hv0 || (!l.cl && !l.sz))); });   // varyantlı üründe renk/beden seçilmiş satıra eklenmez
   if(ex){ ex.qty = String(num(ex.qty) + 1); }
   else {
     var price = lineDefault(type, ed, p);
     var blank = ed.lines.find(function(l){ return !l.pid; });
-    if(blank){ blank.pid = p.id; blank.qty = 1; blank.price = price; blank.noCamp = false; }
-    else ed.lines.push({pid:p.id, qty:1, price:price});
+    if(blank){ blank.pid = p.id; blank.qty = 1; blank.price = price; blank.noCamp = false; blank.cl = vh ? hit.cl : ''; blank.sz = vh ? hit.sz : ''; }
+    else { var nl = {pid:p.id, qty:1, price:price}; if(vh){ nl.cl = hit.cl; nl.sz = hit.sz; } ed.lines.push(nl); }
   }
   render();
   var n = $('#scan'); if(n) n.focus();
-  toast(p.name + ' eklendi');
+  toast(p.name + (vh ? ' (' + varLabel(hit.cl, hit.sz) + ')' : '') + ' eklendi');
 });
 document.addEventListener('input', function(e){
   var t = e.target;
   if(t.dataset.lb !== undefined){ lbChange(t); return; }
   if(t.dataset.cf !== undefined){ campFilter(t.value, t.dataset.cf === '1' ? 'pickprod' : t.dataset.cf); return; }
   if(t.dataset.cpf !== undefined){ cpFilter(t.value); return; }
+  if(t.dataset.vg !== undefined){ vgRefresh(); return; }
+  if(t.dataset.ean !== undefined){ eanLive(t); return; }
   if(t.id === 'stq'){ state.sq.q = t.value; stRefresh(); return; }
   if(t.id === 'bbq'){ bbFilter(); return; }
   if(t.id === 'lblq'){ lblFilter(); return; }
@@ -1664,6 +1977,8 @@ document.addEventListener('change', function(e){
   if(t.dataset.lblf !== undefined){ lblFilter(); return; }
   if((t.name === 'type' || t.name === 'scope' || t.name === 'aud') && $('#mf')) campToggle();
   if($('#mf') && /^(pid|av|cid):/.test(t.name || '')) campCount();
+  if(t.dataset && t.dataset.vg !== undefined) vgRefresh();
+  if(t.name === 'pid' && $('#svsel')) $('#svsel').innerHTML = svHtml(prod(t.value));
   if(t.tagName === 'SELECT') onEd(e);
 });
 
@@ -1777,7 +2092,13 @@ A.genEan = function(){
   var pvw = $('#bcprev'); if(pvw) pvw.innerHTML = ean13Svg(i.value);
 };
 A.label = function(d){
-  var p = prod(d.id); if(!p || !p.barcode) return;
+  var p = prod(d.id); if(!p) return;
+  if(hasVar(p)){                                               // varyantlı ürün: varyant seçimli etiket ekranı
+    lblPre = lblItemsOf(p).filter(function(it){ return it.bc; }).map(function(it){ return it.suf; }); lblPreQ = p.name;
+    if(!lblPre.length){ toast('Bu ürünün varyantlarına henüz barkod verilmemiş', 'err'); return; }
+    A.batchLabels(); return;
+  }
+  if(!p.barcode) return;
   var o = lblOpt(); applyLblCss(o);
   var h = '<div class="lbls2">' + labelHTML(p, o) + '</div>';
   lastRcpt = {html:h, name:'etiket-' + (p.code || p.barcode), pageCss:lblPage(o), css:lblCss(o) + lblPage(o)};
@@ -1792,7 +2113,7 @@ V.attrs = function(){
   var names = attrNames();
   var used = function(i, code){ return db.products.filter(function(p){ return (p.attrs || [])[i] === code; }).length; };
   return '<div class="bar"><h2>Ürün özellikleri</h2></div>' +
-  '<div class="legend">Önce özelliğe bir ad verin (en fazla 5), sonra her özellik için kod ve açıklamalı değerler tanımlayın. Ürün kartında bu değerler listeden seçilir, elle yazılmaz. Kampanyalar da bu değerlere göre tanımlanır.</div>' +
+  '<div class="legend">Önce özelliğe bir ad verin (en fazla 5), sonra her özellik için kod ve açıklamalı değerler tanımlayın. Ürün kartında bu değerler listeden seçilir, elle yazılmaz. Kampanyalar da bu değerlere göre tanımlanır. Sayfanın altındaki <b>Renkler</b> ve <b>Bedenler</b> listeleri renk/beden varyantları içindir; onlar da ürün kartında buradan seçilir.</div>' +
   (can('attrs.edit') ? '<div class="card"><h3>Özellik adları</h3><div class="cols3">' + names.map(function(v, i){ return fld('Özellik ' + (i + 1), '<input id="s_at' + i + '" value="' + esc(v) + '" placeholder="Boş = kullanılmaz">'); }).join('') + '</div><button class="btn pri" data-act="saveAttrs">Adları kaydet</button></div>' : '') +
   names.map(function(n, i){
     if(!n) return '';
@@ -1801,8 +2122,66 @@ V.attrs = function(){
       (vals.length ? '<div class="tbl"><table><thead><tr><th>Kod</th><th>Açıklama</th><th class="r">Ürün</th><th></th></tr></thead><tbody>' + vals.map(function(v, k){
         return '<tr><td><b>' + esc(v.c) + '</b></td><td>' + esc(v.d) + '</td><td class="r">' + used(i, v.c) + '</td><td class="r">' + (can('attrs.edit') ? '<button class="btn sm" data-act="editVal" data-i="' + i + '" data-k="' + k + '">Düzenle</button> <button class="btn sm danger" data-act="delVal" data-i="' + i + '" data-k="' + k + '">Sil</button>' : '') + '</td></tr>';
       }).join('') + '</tbody></table></div>' : '<div class="muted">Henüz değer yok. “Değer ekle” ile başlayın.</div>') + '</div>';
-  }).join('');
+  }).join('') + catCard('color') + catCard('size');
 };
+function catUsedProducts(kind, code){ var key = kind === 'color' ? 'colors' : 'sizes'; return db.products.filter(function(p){ return (p[key] || []).some(function(x){ return lk(x) === lk(code); }); }).length; }
+function catUsedHard(kind, code){                                // belge ve stok hareketleri değiştirilemez kayıtlardır
+  var key = kind === 'color' ? 'cl' : 'sz', l = lk(code);
+  return db.moves.some(function(m){ return m[key] && lk(m[key]) === l; }) || db.docs.some(function(d){ return d.lines.some(function(x){ return x[key] && lk(x[key]) === l; }); });
+}
+function catCard(kind){
+  var arr = varCat(kind), nm = kind === 'color' ? 'Renkler' : 'Bedenler', can_ = can('attrs.edit');
+  return '<div class="card"><div class="bar" style="margin-bottom:8px"><h3 style="margin:0">' + nm + ' <span class="muted" style="font-size:13px;font-weight:400">(renk/beden varyantı)</span></h3><span class="spacer"></span>' + (can_ ? '<button class="btn pri sm" data-act="addCat" data-kind="' + kind + '">+ ' + (kind === 'color' ? 'Renk' : 'Beden') + ' ekle</button>' : '') + '</div>' +
+    '<div class="muted" style="font-size:12px;margin-bottom:8px">' + (kind === 'size' ? 'Bedenler ürün kartında ve satışta bu sırayla görünür. ↑ ↓ ile sıralayın (S, M, L, XL gibi). ' : '') + 'Ürün kartında işaretlenir. Kullanılmış bir kodun yalnızca açıklaması değiştirilebilir.</div>' +
+    (arr.length ? '<div class="tbl"><table><thead><tr><th>Kod</th><th>Açıklama</th><th class="r">Ürün</th><th></th></tr></thead><tbody>' + arr.map(function(v, k){
+      return '<tr><td><b>' + esc(v.c) + '</b></td><td>' + esc(v.d) + '</td><td class="r">' + catUsedProducts(kind, v.c) + '</td><td class="r nw">' + (can_ ? '<button class="btn sm" data-act="moveCat" data-kind="' + kind + '" data-k="' + k + '" data-dir="-1" title="Yukarı"' + (k === 0 ? ' disabled' : '') + '>↑</button> <button class="btn sm" data-act="moveCat" data-kind="' + kind + '" data-k="' + k + '" data-dir="1" title="Aşağı"' + (k === arr.length - 1 ? ' disabled' : '') + '>↓</button> <button class="btn sm" data-act="editCat" data-kind="' + kind + '" data-k="' + k + '">Düzenle</button> <button class="btn sm danger" data-act="delCat" data-kind="' + kind + '" data-k="' + k + '">Sil</button>' : '') + '</td></tr>';
+    }).join('') + '</tbody></table></div>' : '<div class="muted">Henüz ' + (kind === 'color' ? 'renk' : 'beden') + ' tanımı yok. “Ekle” ile başlayın.</div>') + '</div>';
+}
+function catClean(f){
+  var c = String(f.c || '').replace(/[|,;]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 40);
+  return {c:c, d:(String(f.d || '').trim().slice(0, 80) || c)};
+}
+function catClash(arr, c, d, self){                              // kod ve açıklamalar tek havuzda benzersiz olmalı (Excel eşleştirmesi belirsiz kalmasın)
+  for(var j = 0; j < arr.length; j++){
+    if(j === self) continue; var x = arr[j];
+    if(lk(x.c) === lk(c)) return 'Bu kod zaten tanımlı';
+    if(lk(x.d) === lk(c)) return 'Bu kod, başka bir değerin açıklamasıyla aynı (' + x.d + ')';
+    if(lk(x.c) === lk(d) || lk(x.d) === lk(d)) return 'Bu açıklama zaten kullanılıyor (' + d + ')';
+  }
+  return '';
+}
+function catAddOne(kind, f){                                      // ortak ekleme: {ok, code} veya {err}
+  var v = catClean(f); if(!v.c) return {err:'Kod girin'};
+  var st = db.settings, key = kind === 'color' ? 'colorCat' : 'sizeCat'; if(!Array.isArray(st[key])) st[key] = [];
+  var ce = catClash(st[key], v.c, v.d, -1); if(ce) return {err:ce};
+  st[key].push(v); return {ok:true, code:v.c};
+}
+function catForm(kind, k){
+  var arr = varCat(kind), v = k != null ? arr[k] : null, nm = kind === 'color' ? 'renk' : 'beden';
+  var hard = v ? catUsedHard(kind, v.c) : false;
+  modal((v ? 'Değeri düzenle' : 'Yeni ' + nm) + ' · ' + (kind === 'color' ? 'Renkler' : 'Bedenler'),
+    '<div class="cols">' + fld('Kod', '<input name="c" required maxlength="40" value="' + esc(v ? v.c : '') + '"' + (hard ? ' readonly' : '') + ' placeholder="' + (kind === 'color' ? 'Örn. KRM' : 'Örn. XL') + '">') + fld('Açıklama', '<input name="d" maxlength="80" value="' + esc(v ? v.d : '') + '" placeholder="' + (kind === 'color' ? 'Örn. Kırmızı' : 'Örn. Çok büyük') + '">') + '</div>' +
+    (hard ? '<div class="hint">Bu ' + nm + ' belge veya stok hareketlerinde kullanıldığı için <b>kod değiştirilemez</b>. Açıklamayı istediğiniz zaman değiştirebilirsiniz; ekranlarda açıklama görünür.</div>' : '<div class="muted" style="font-size:12px">Kod kısa bir tanıdır (belgelerde saklanır), açıklama ekranlarda görünür. Kod yazarken virgül ve “|” kullanılamaz.</div>'),
+    function(f){
+      var n = catClean(f); if(!n.c){ toast('Kod girin', 'err'); return false; }
+      if(v){
+        var ce = catClash(arr, n.c, n.d, k); if(ce){ toast(ce, 'err'); return false; }
+        if(n.c !== v.c){
+          if(hard){ toast('Kod değiştirilemez, yalnızca açıklama', 'err'); return false; }
+          var key = kind === 'color' ? 'colors' : 'sizes', pos = kind === 'color' ? 0 : 1, old = v.c;
+          db.products.forEach(function(p){
+            if(Array.isArray(p[key])) p[key] = p[key].map(function(x){ return lk(x) === lk(old) ? n.c : x; });
+            var m = vbcOf(p), ks = Object.keys(m);
+            if(ks.length){ var nm2 = {}; ks.forEach(function(kk){ var ab = kk.split('|'); if(lk(ab[pos]) === lk(old)) ab[pos] = n.c; nm2[ab.join('|')] = m[kk]; }); p.vbc = nm2; }
+          });
+        }
+        v.c = n.c; v.d = n.d;
+      } else {
+        var r = catAddOne(kind, f); if(r.err){ toast(r.err, 'err'); return false; }
+      }
+      commit(); toast('Kaydedildi');
+    });
+}
 function valForm(i, k){
   var v = k != null ? attrVals(i)[k] : null;
   modal((v ? 'Değeri düzenle' : 'Yeni değer') + ' · ' + attrNames()[i],
@@ -1894,7 +2273,11 @@ var IMP_COLS = {
   wprice:['toptanfiyati', 'toptanfiyat', 'toptan', 'toptansatisfiyati', 'toptansatis'],
   vat:['kdv', 'kdvorani', 'kdvoran'],
   min:['kritikstok', 'kritikstokseviyesi', 'kritik', 'minstok', 'minimumstok'],
-  open:['acilisstogu', 'acilisstok', 'acilis', 'stok', 'miktar', 'mevcutstok']
+  open:['acilisstogu', 'acilisstok', 'acilis', 'stok', 'miktar', 'mevcutstok'],
+  cl:['renkvaryant', 'varyantrenk', 'renk'],
+  sz:['bedenvaryant', 'varyantbeden', 'beden'],
+  colors:['renkler'],
+  sizes:['bedenler']
 };
 var IMP_LABEL = {cost:'Alış fiyatı', price:'Perakende fiyatı', wprice:'Toptan fiyatı', vat:'KDV', min:'Kritik stok', open:'Açılış stoğu'};
 var UNIT_MAP = {adet:'adet', ad:'adet', kg:'kg', kilo:'kg', kilogram:'kg', gr:'gr', g:'gr', gram:'gr', lt:'lt', l:'lt', litre:'lt', metre:'metre', mt:'metre', m:'metre', koli:'koli', paket:'paket', pk:'paket', cift:'çift'};
@@ -2007,32 +2390,69 @@ function impErrMsg(e){
 }
 
 /* analiz: her satır yeni / güncellenecek / atlanacak / hatalı olarak işaretlenir */
+function vSan(t){ return String(t == null ? '' : t).replace(/\|/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 40); }
+function pickSpell(arr, v){ var lv = lk(v), f = arr.find(function(x){ return lk(x) === lv; }); return f !== undefined ? f : v; }
+function impBc(raw){                                           // barkod biçimi: {bc, err, note}
+  var bc = String(raw || '').replace(/\s/g, ''), r = {bc:bc, err:'', note:''};
+  if(!bc) return r;
+  if(/^\d+[.,]?\d*e[+\-]?\d+$/i.test(bc)) r.err = 'Barkod bilimsel gösterimde (Excel bozmuş). Sütunu Metin biçimine çevirin';
+  else if(/^\d{12}$/.test(bc) && ean13Check('0' + bc.slice(0, 11)) === +bc[11]){ r.bc = '0' + bc; r.note = 'Başına 0 eklendi'; }
+  else if(/^\d{13}$/.test(bc) && ean13Check(bc.slice(0, 12)) !== +bc[12]) r.err = 'EAN-13 kontrol hanesi hatalı (doğrusu ' + bc.slice(0, 12) + ean13Check(bc.slice(0, 12)) + ')';
+  return r;
+}
+/* analiz: her satır yeni / güncellenecek / atlanacak / hatalı olarak işaretlenir */
 function impFind(rc){
   var bc = (rc.barcode || '').toLowerCase(), cd = (rc.code || '').toLowerCase(), nm = (rc.name || '').toLowerCase();
   var byBc = bc ? db.products.find(function(p){ return p.barcode && p.barcode.toLowerCase() === bc; }) : null;
   var byCd = cd ? db.products.find(function(p){ return p.code && p.code.toLowerCase() === cd; }) : null;
   if(byBc && byCd && byBc.id !== byCd.id) return {conflict:true};
   var ex = byBc || byCd;
+  if(!ex && rc.variants && rc.variants.length){                // varyant barkodundan mevcut ürünü bul
+    var vb0 = rc.variants.map(function(v){ return String(v.bc || '').toLowerCase(); }).filter(Boolean);
+    if(vb0.length) ex = db.products.find(function(p){ var m = vbcOf(p); return Object.keys(m).some(function(k){ return vb0.indexOf(String(m[k]).toLowerCase()) >= 0; }); }) || null;
+  }
   if(!ex && !bc && !cd) ex = db.products.find(function(p){ return p.name.toLowerCase() === nm; });
   return {ex:ex || null};
 }
 function impAnalyze(table, opt){
-  var out = {rows:[], hdrErr:'', unknown:[], truncated:false};
+  var out = {rows:[], hdrErr:'', unknown:[], truncated:false, notes:[]};
   var blank = function(r){ return !r.some(function(c){ return String(c == null ? '' : c).trim() !== ''; }); };
   var hi = table.findIndex(function(r){ return !blank(r); });
   if(hi < 0){ out.hdrErr = 'Dosyada veri bulunamadı.'; return out; }
   var heads = table[hi].map(nz), names = attrNames(), col = {};
   Object.keys(IMP_COLS).forEach(function(k){ var ix = heads.findIndex(function(h){ return h && IMP_COLS[k].indexOf(h) >= 0; }); if(ix >= 0) col[k] = ix; });
   var acol = names.map(function(n){ if(!n) return -1; var h = nz(n); return heads.findIndex(function(x){ return x && x === h; }); });
+  ['cl', 'sz'].forEach(function(k){                            // "Renk" / "Beden" adlı bir ÖZELLİK varsa aynı başlık özellik sayılır; açık başlığa ("Renk (varyant)") öncelik verilir
+    var found = -1, blocked = '';
+    IMP_COLS[k].some(function(a){
+      var ix = heads.indexOf(a); if(ix < 0) return false;
+      if(acol.indexOf(ix) >= 0){ blocked = blocked || String(table[hi][ix]).trim(); return false; }
+      found = ix; return true;
+    });
+    if(found >= 0) col[k] = found;
+    else { delete col[k]; if(blocked) out.notes.push('“' + blocked + '” sütunu özellik olarak okundu. Renk/beden varyantı için “' + (k === 'cl' ? 'Renk' : 'Beden') + ' (varyant)” başlığını kullanın.'); }
+  });
   var used = {}; Object.keys(col).forEach(function(k){ used[col[k]] = 1; }); acol.forEach(function(i){ if(i >= 0) used[i] = 1; });
   out.unknown = table[hi].filter(function(h, i){ return String(h == null ? '' : h).trim() && !used[i]; }).map(String);
   if(col.name == null){ out.hdrErr = 'Başlık satırında “Ürün adı” sütunu bulunamadı.'; return out; }
-  var seen = {};
+  var seen = {}, seenBc = {}, groups = {}, fileVar = col.cl != null || col.sz != null, pend = {color:[], size:[]};
+  var mapCat = function(kind, raw, rc, notes){                   // dosyadaki değer → listedeki kod (kod veya açıklama yazılabilir)
+    raw = vSan(raw); if(!raw) return {code:''};
+    var f = catFind(kind, raw); if(f) return {code:f};
+    var pn = pend[kind].find(function(x){ return lk(x.c) === lk(raw); });
+    if(pn){ rc.newCats.push({kind:kind, c:pn.c, d:pn.d}); return {code:pn.c}; }
+    if(opt.autoAttr){ var e = {c:raw, d:raw}; pend[kind].push(e); rc.newCats.push({kind:kind, c:e.c, d:e.d}); notes.push('Yeni ' + (kind === 'color' ? 'renk' : 'beden') + ': ' + raw); return {code:raw}; }
+    out.catHint = true;
+    return {err:'Tanımsız ' + (kind === 'color' ? 'renk' : 'beden') + ': ' + raw};
+  };
   for(var r = hi + 1; r < table.length; r++){
     var row = table[r]; if(blank(row)) continue;
     if(out.rows.length >= 5000){ out.truncated = true; break; }
+    out.read = (out.read || 0) + 1;
     var get = function(k){ return col[k] != null ? row[col[k]] : ''; };
-    var rc = {name:tx(get('name')), code:tx(get('code')), barcode:tx(get('barcode')).replace(/\s/g, ''), unit:'', has:{}, attrs:['', '', '', '', ''], newVals:[]};
+    var rc = {name:tx(get('name')), code:tx(get('code')), barcode:tx(get('barcode')).replace(/\s/g, ''), unit:'', has:{}, attrs:['', '', '', '', ''], newVals:[], variants:[], colors:[], sizes:[], vbc:''};
+    var rawCl = fileVar ? vSan(tx(get('cl'))) : '', rawSz = fileVar ? vSan(tx(get('sz'))) : '', isVar = !!(rawCl || rawSz), vcl = '', vsz = '';
+    rc.newCats = [];
     var notes = [], err = '';
     if(!rc.name) err = 'Ürün adı boş';
     ['cost', 'price', 'wprice', 'min', 'open', 'vat'].forEach(function(k){
@@ -2045,11 +2465,7 @@ function impAnalyze(table, opt){
     });
     var ut = tx(get('unit'));
     if(ut){ var mu = UNIT_MAP[nz(ut)]; rc.unit = mu || 'adet'; rc.has.unit = true; if(!mu) notes.push('Birim tanınmadı, adet yapıldı'); }
-    if(!err && rc.barcode){
-      if(/^\d+[.,]?\d*e[+\-]?\d+$/i.test(rc.barcode)) err = 'Barkod bilimsel gösterimde (Excel bozmuş). Sütunu Metin biçimine çevirin';
-      else if(/^\d{12}$/.test(rc.barcode) && ean13Check('0' + rc.barcode.slice(0, 11)) === +rc.barcode[11]){ rc.barcode = '0' + rc.barcode; notes.push('Başına 0 eklendi'); }
-      else if(/^\d{13}$/.test(rc.barcode) && ean13Check(rc.barcode.slice(0, 12)) !== +rc.barcode[12]) err = 'EAN-13 kontrol hanesi hatalı (doğrusu ' + rc.barcode.slice(0, 12) + ean13Check(rc.barcode.slice(0, 12)) + ')';
-    }
+    if(!err && rc.barcode){ var bb = impBc(rc.barcode); if(bb.err) err = bb.err; else { rc.barcode = bb.bc; if(bb.note) notes.push(bb.note); } }
     if(!err){
       names.forEach(function(n, i){
         if(err || acol[i] < 0) return;
@@ -2060,6 +2476,45 @@ function impAnalyze(table, opt){
         if(opt.autoAttr){ rc.attrs[i] = t; rc.newVals.push({i:i, c:t, d:t}); notes.push('Yeni ' + n + ' değeri: ' + t); }
         else err = 'Tanımsız ' + n + ' değeri: ' + t;
       });
+    }
+    if(!err && !fileVar){                                      // tek satırda liste biçimi: "Renkler" ve "Bedenler" sütunları
+      var mapList = function(k, kind, arr){
+        parseList(tx(get(k))).forEach(function(x){ if(err) return; var m = mapCat(kind, x, rc, notes); if(m.err) err = m.err; else if(m.code && arr.indexOf(m.code) < 0) arr.push(m.code); });
+      };
+      if(col.colors != null) mapList('colors', 'color', rc.colors);
+      if(col.sizes != null) mapList('sizes', 'size', rc.sizes);
+    }
+    if(!err && isVar){
+      var mc = mapCat('color', rawCl, rc, notes), ms = mapCat('size', rawSz, rc, notes);
+      if(mc.err) err = mc.err; else if(ms.err) err = ms.err; else { vcl = mc.code; vsz = ms.code; }
+    }
+    var pkey = rc.code ? 'c:' + rc.code.toLowerCase() : 'n:' + rc.name.toLowerCase();
+    if(isVar){                                                 // varyant satırı: Barkod ve Açılış stoğu bu varyanta aittir
+      rc.vbc = rc.barcode; rc.barcode = '';
+      rc.variants = [{cl:vcl || rawCl, sz:vsz || rawSz, bc:rc.vbc, open:(rc.has.open ? rc.open : 0), n:r + 1}];
+      var g = groups[pkey];
+      if(!err && g){                                           // aynı ürünün sonraki varyant satırı: ilk satıra birleşir
+        var gv = g.rec, e2 = '', v0 = gv.variants[0];
+        var scl = pickSpell(gv.variants.map(function(x){ return x.cl; }).filter(Boolean), vcl), ssz = pickSpell(gv.variants.map(function(x){ return x.sz; }).filter(Boolean), vsz);
+        var dupV = gv.variants.find(function(x){ return x.cl === scl && x.sz === ssz; });
+        if(!!v0.cl !== !!vcl) e2 = vcl ? 'Bu ürünün ilk satırında renk yok' : 'Bu ürünün diğer satırlarında renk var, bu satırda yok';
+        else if(!!v0.sz !== !!vsz) e2 = vsz ? 'Bu ürünün ilk satırında beden yok' : 'Bu ürünün diğer satırlarında beden var, bu satırda yok';
+        else if(dupV) e2 = 'Aynı renk ve beden satırı tekrar (satır ' + dupV.n + ')';
+        else if(rc.vbc){
+          var lb = rc.vbc.toLowerCase();
+          if(seenBc[lb]) e2 = 'Dosyada tekrar eden barkod (satır ' + seenBc[lb] + ')';
+          else if(barcodeTaken(rc.vbc, g.ex || null)) e2 = 'Barkod başka üründe kayıtlı';
+        }
+        if(e2){ out.rows.push({n:r + 1, st:'err', msg:e2, rec:rc, ex:g.ex}); continue; }
+        rc.variants[0].cl = scl; rc.variants[0].sz = ssz;
+        gv.variants.push(rc.variants[0]);
+        if(rc.vbc) seenBc[rc.vbc.toLowerCase()] = r + 1;
+        ['cost', 'price', 'wprice', 'min', 'vat', 'unit'].forEach(function(k){ if(!gv.has[k] && rc.has[k]){ gv[k] = rc[k]; gv.has[k] = true; } });
+        rc.attrs.forEach(function(c, i){ if(c && !gv.attrs[i]) gv.attrs[i] = c; });
+        rc.newVals.forEach(function(v){ gv.newVals.push(v); });
+        rc.newCats.forEach(function(v){ gv.newCats.push(v); });
+        continue;
+      }
     }
     var st = 'new', exId = '';
     if(!err){
@@ -2073,35 +2528,69 @@ function impAnalyze(table, opt){
         if(!err){
           if(fx.ex){
             exId = fx.ex.id;
-            if(rc.barcode && db.products.some(function(p){ return p.id !== fx.ex.id && p.barcode === rc.barcode; })) err = 'Barkod başka üründe kayıtlı';
+            if(rc.barcode && barcodeTaken(rc.barcode, fx.ex.id)) err = 'Barkod başka üründe kayıtlı';
             else if(opt.mode === 'update'){ st = 'upd'; notes.push('Mevcut ürün güncellenecek: ' + fx.ex.name); }
             else { st = 'skip'; notes.push('Zaten kayıtlı: ' + fx.ex.name); }
-          } else if(!rc.barcode && opt.autoBc) notes.push('Barkod otomatik verilecek');
+          } else if(rc.barcode && barcodeTaken(rc.barcode, null)) err = 'Barkod başka üründe kayıtlı';
+          else if(!rc.barcode && !isVar && opt.autoBc) notes.push('Barkod otomatik verilecek');
+          if(!err && isVar && rc.vbc){
+            var lb0 = rc.vbc.toLowerCase();
+            if(seenBc[lb0]) err = 'Dosyada tekrar eden barkod (satır ' + seenBc[lb0] + ')';
+            else if(barcodeTaken(rc.vbc, exId || null)) err = 'Barkod başka üründe kayıtlı';
+            else seenBc[lb0] = r + 1;
+          }
         }
       }
     }
     if(err) st = 'err';
-    out.rows.push({n:r + 1, st:st, msg:err || notes.join(' · '), rec:rc, ex:exId});
+    var entry = {n:r + 1, st:st, msg:err || notes.join(' · '), rec:rc, ex:exId};
+    out.rows.push(entry);
+    if(isVar && st !== 'err') groups[pkey] = entry;
   }
+  out.rows.forEach(function(x){                                // varyant özeti
+    var rc = x.rec; if(x.st === 'err') return;
+    var add = function(t){ x.msg = (x.msg ? x.msg + ' · ' : '') + t; };
+    if(rc.variants.length){
+      var cs = [], ss = [];
+      rc.variants.forEach(function(v){ if(v.cl && cs.indexOf(v.cl) < 0) cs.push(v.cl); if(v.sz && ss.indexOf(v.sz) < 0) ss.push(v.sz); });
+      rc.colors = cs; rc.sizes = ss;
+      add(rc.variants.length + ' varyant' + (cs.length ? ', ' + cs.length + ' renk' : '') + (ss.length ? ', ' + ss.length + ' beden' : ''));
+      if(x.st === 'upd' && rc.variants.some(function(v){ return v.open > 0; })) add('Açılış stoğu yalnızca yeni ürünlerde uygulanır');
+    } else if(rc.colors.length || rc.sizes.length){
+      add((rc.colors.length ? rc.colors.length + ' renk' : '') + (rc.colors.length && rc.sizes.length ? ', ' : '') + (rc.sizes.length ? rc.sizes.length + ' beden' : ''));
+      if(x.st === 'new' && rc.has.open && rc.open > 0) add('Açılış stoğu atlanacak (renk/bedenli ürünlerde her varyant ayrı satırda girilir)');
+    }
+  });
   return out;
 }
 function impApply(an, opt){
-  var cnt = {new:0, upd:0, skip:0, err:0, bc:0};
+  var cnt = {new:0, upd:0, skip:0, err:0, bc:0, vars:0};
   an.rows.forEach(function(x){
     if(x.st === 'err'){ cnt.err++; return; }
     if(x.st === 'skip'){ cnt.skip++; return; }
-    var rc = x.rec;
+    var rc = x.rec, vars = rc.variants || [], hasV = !!((rc.colors && rc.colors.length) || (rc.sizes && rc.sizes.length));
     rc.newVals.forEach(function(v){
       ensureAttrVals();
       var arr = db.settings.attrVals[v.i];
       if(!arr.some(function(a){ return a.c.toLowerCase() === v.c.toLowerCase(); })) arr.push({c:v.c, d:v.d});
     });
+    (rc.newCats || []).forEach(function(v){ catAddOne(v.kind, {c:v.c, d:v.d}); });
     if(x.st === 'new'){
       var p = {id:uid(), name:rc.name, code:rc.code, barcode:rc.barcode, unit:rc.has.unit ? rc.unit : 'adet', cost:rc.cost || 0, price:rc.price || 0, min:rc.min || 0, vat:rc.has.vat ? rc.vat : 20, attrs:rc.attrs.slice(), created:today()};
       if(rc.wprice > 0) p.wprice = rc.wprice;
-      if(!p.barcode && opt.autoBc){ p.barcode = nextEan(); cnt.bc++; }
+      if(rc.colors.length) p.colors = rc.colors.slice();
+      if(rc.sizes.length) p.sizes = rc.sizes.slice();
+      if(!p.barcode && opt.autoBc && !hasV){ p.barcode = nextEan(); if(p.barcode) cnt.bc++; }
       db.products.push(p);
-      if(rc.open > 0) db.moves.push({id:uid(), pid:p.id, qty:rc.open, date:today(), reason:'Açılış stoğu (Excel)', ts:Date.now()});
+      if(vars.length){
+        vars.forEach(function(v){
+          var bc = v.bc;
+          if(!bc && opt.autoBc){ bc = nextEan(); if(bc) cnt.bc++; }
+          if(bc){ p.vbc = p.vbc || {}; p.vbc[vkeyOf(v.cl, v.sz)] = bc; }
+          if(v.open > 0){ var mv = {id:uid(), pid:p.id, qty:v.open, date:today(), reason:'Açılış stoğu (Excel)', ts:Date.now()}; if(v.cl) mv.cl = v.cl; if(v.sz) mv.sz = v.sz; db.moves.push(mv); }
+          cnt.vars++;
+        });
+      } else if(rc.open > 0 && !hasV) db.moves.push({id:uid(), pid:p.id, qty:rc.open, date:today(), reason:'Açılış stoğu (Excel)', ts:Date.now()});
       cnt.new++;
     } else {
       var q = db.products.find(function(y){ return y.id === x.ex; });
@@ -2113,6 +2602,17 @@ function impApply(an, opt){
       if(rc.has.wprice){ if(rc.wprice > 0) q.wprice = rc.wprice; else delete q.wprice; }
       q.attrs = q.attrs || ['', '', '', '', ''];
       rc.attrs.forEach(function(c, i){ if(c) q.attrs[i] = c; });
+      if(hasV){                                                // renk/beden listeleri birleşir, varyant barkodları yazılır
+        var qc = (q.colors || []).slice(), qs = (q.sizes || []).slice();
+        rc.colors.forEach(function(c){ if(!qc.some(function(y){ return lk(y) === lk(c); })) qc.push(c); });
+        rc.sizes.forEach(function(z){ if(!qs.some(function(y){ return lk(y) === lk(z); })) qs.push(z); });
+        if(qc.length) q.colors = qc; if(qs.length) q.sizes = qs;
+        vars.forEach(function(v){
+          var key = vkeyOf(v.cl ? pickSpell(qc, v.cl) : '', v.sz ? pickSpell(qs, v.sz) : '');
+          if(v.bc){ q.vbc = q.vbc || {}; q.vbc[key] = v.bc; }
+          cnt.vars++;
+        });
+      }
       cnt.upd++;
     }
   });
@@ -2127,11 +2627,12 @@ function impPreview(an, opt){
   var ok = c['new'] + c.upd;
   var tags = {'new':'<span class="tag sale">Yeni</span>', upd:'<span class="tag in">Güncellenecek</span>', skip:'<span class="tag move">Atlanacak</span>', err:'<span class="tag bad">Hata</span>'};
   var rows = an.rows.slice(0, 300).map(function(r){
-    return '<tr><td class="muted">' + r.n + '</td><td>' + tags[r.st] + '</td><td><b>' + esc(r.rec.name) + '</b></td><td class="muted">' + esc(r.rec.code) + (r.rec.barcode ? '<div>' + esc(r.rec.barcode) + '</div>' : '') + '</td><td class="r">' + (r.rec.has.price ? money(r.rec.price) : '') + '</td><td' + (r.st === 'err' ? ' class="neg"' : ' class="muted"') + '>' + esc(r.msg) + '</td></tr>';
+    var vs = (r.rec.variants && r.rec.variants.length) || r.rec.colors.length || r.rec.sizes.length ? '<div class="muted" style="font-size:12px">' + esc(varSummary({colors:r.rec.colors, sizes:r.rec.sizes})) + '</div>' : '';
+    return '<tr><td class="muted">' + r.n + '</td><td>' + tags[r.st] + '</td><td><b>' + esc(r.rec.name) + '</b>' + (r.rec.variants && r.rec.variants[0] && r.st === 'err' ? '<div class="muted" style="font-size:12px">' + esc(varLabel(r.rec.variants[0].cl, r.rec.variants[0].sz)) + '</div>' : vs) + '</td><td class="muted">' + esc(r.rec.code) + (r.rec.barcode ? '<div>' + esc(r.rec.barcode) + '</div>' : '') + '</td><td class="r">' + (r.rec.has.price ? money(r.rec.price) : '') + '</td><td' + (r.st === 'err' ? ' class="neg"' : ' class="muted"') + '>' + esc(r.msg) + '</td></tr>';
   }).join('');
   modal('İçe aktarma önizlemesi',
-    '<div class="hint"><b>' + an.rows.length + '</b> satır okundu: ' + c['new'] + ' yeni, ' + c.upd + ' güncellenecek, ' + c.skip + ' atlanacak, ' + c.err + ' hatalı.' +
-      (an.unknown.length ? '<br>Tanınmayan sütunlar yok sayıldı: ' + esc(an.unknown.join(', ')) : '') + (an.truncated ? '<br>İlk 5000 satır okundu.' : '') + '</div>' +
+    '<div class="hint"><b>' + (an.read || an.rows.length) + '</b> satır okundu' + ((an.read || an.rows.length) !== an.rows.length ? ' (renk/beden satırları ürüne birleştirildi: ' + an.rows.length + ' kayıt)' : '') + ': ' + c['new'] + ' yeni, ' + c.upd + ' güncellenecek, ' + c.skip + ' atlanacak, ' + c.err + ' hatalı.' +
+      (an.unknown.length ? '<br>Tanınmayan sütunlar yok sayıldı: ' + esc(an.unknown.join(', ')) : '') + (an.notes && an.notes.length ? '<br>' + esc(an.notes.join(' ')) : '') + (an.catHint ? '<br>Tanımsız renk/beden değerleri için Özellikler sekmesinde tanım açın ya da içe aktarma ekranındaki “otomatik ekle” kutusunu işaretleyin.' : '') + (an.truncated ? '<br>İlk 5000 satır okundu.' : '') + '</div>' +
     (c.err ? '<div class="muted" style="margin-bottom:8px">Hatalı satırlar aktarılmaz. Dosyayı düzeltip yeniden yükleyebilir ya da yalnızca geçerli satırları aktarabilirsiniz.</div>' : '') +
     '<div class="tbl" style="max-height:340px;overflow:auto"><table><thead><tr><th>Satır</th><th>Durum</th><th>Ürün</th><th>Kod / barkod</th><th class="r">Satış</th><th>Not</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
     (an.rows.length > 300 ? '<div class="muted">İlk 300 satır gösteriliyor, aktarım tüm geçerli satırları kapsar.</div>' : ''),
@@ -2143,14 +2644,17 @@ function impPreview(an, opt){
 }
 function impDone(r){
   modal('Aktarım tamamlandı',
-    '<div class="hint"><b>' + r['new'] + '</b> yeni ürün açıldı, <b>' + r.upd + '</b> ürün güncellendi' + (r.skip ? ', ' + r.skip + ' kayıtlı ürün atlandı' : '') + (r.err ? ', ' + r.err + ' hatalı satır aktarılmadı' : '') + '.' + (r.bc ? '<br>' + r.bc + ' ürüne otomatik EAN-13 barkod verildi.' : '') + '</div>', null);
+    '<div class="hint"><b>' + r['new'] + '</b> yeni ürün açıldı, <b>' + r.upd + '</b> ürün güncellendi' + (r.vars ? ' (toplam ' + r.vars + ' renk/beden varyantı)' : '') + (r.skip ? ', ' + r.skip + ' kayıtlı ürün atlandı' : '') + (r.err ? ', ' + r.err + ' hatalı satır aktarılmadı' : '') + '.' + (r.bc ? '<br>' + r.bc + ' ürüne/varyanta otomatik EAN-13 barkod verildi.' : '') + '</div>', null);
 }
 A.impTemplate = async function(){
   var names = attrNames().filter(function(n){ return n; });
-  var head = ['Ürün adı', 'Ürün kodu', 'Barkod', 'Birim', 'Alış fiyatı', 'Perakende fiyatı', 'Toptan fiyatı', 'KDV', 'Kritik stok', 'Açılış stoğu'].concat(names);
-  var ex1 = ['Yeşil Çay 500 g', 'CAY-001', '', 'paket', '60,00', '100,00', '85,00', '10', '5', '40'], ex2 = ['Seramik Kupa', 'KUP-010', '', 'adet', '20,00', '49,90', '', '20', '3', '12'];
+  var head = ['Ürün adı', 'Ürün kodu', 'Barkod', 'Birim', 'Alış fiyatı', 'Perakende fiyatı', 'Toptan fiyatı', 'KDV', 'Kritik stok', 'Açılış stoğu', 'Renk (varyant)', 'Beden (varyant)'].concat(names);
+  var eb = function(b){ return b + ean13Check(b); };
+  var ex1 = ['Yeşil Çay 500 g', 'CAY-001', '', 'paket', '60,00', '100,00', '85,00', '10', '5', '40', '', ''], ex2 = ['Seramik Kupa', 'KUP-010', '', 'adet', '20,00', '49,90', '', '20', '3', '12', '', ''];
+  var tv = function(bc, open, cl, sz){ return ['Slim Tişört', 'TSR-001', eb(bc), 'adet', '80,00', '150,00', '120,00', '10', '5', open, cl, sz]; };
+  var rows = [ex1, ex2, tv('290000000101', '12', 'Kırmızı', 'M'), tv('290000000102', '8', 'Kırmızı', 'L'), tv('290000000103', '6', 'Mavi', 'M')];
   var pad = function(a){ while(a.length < head.length) a.push(''); return a; };
-  var csv = '\uFEFF' + [head, pad(ex1), pad(ex2)].map(function(r){ return r.map(function(c){ return /[;"\n]/.test(c) ? '"' + c.replace(/"/g, '""') + '"' : c; }).join(';'); }).join('\r\n') + '\r\n';
+  var csv = '\uFEFF' + [head].concat(rows.map(pad)).map(function(r){ return r.map(function(c){ return /[;"\n]/.test(c) ? '"' + c.replace(/"/g, '""') + '"' : c; }).join(';'); }).join('\r\n') + '\r\n';
   var r = await saveFile('urun-sablonu.csv', csv);
   toast(r === 'ok' ? 'Şablon kaydedildi' : r === 'declined' ? 'İptal edildi' : 'Dosya kaydedilemedi', r === 'fail' ? 'err' : '');
 };
@@ -2162,8 +2666,9 @@ A.impExcel = function(){
     '<textarea name="paste" rows="4" placeholder="Ürün adı&#9;Ürün kodu&#9;Barkod&#9;..."></textarea>' +
     '<div style="margin-top:10px">' + fld('Barkodu veya kodu zaten kayıtlı olan ürünler', '<select name="mode"><option value="skip">Atla, dokunma</option><option value="update">Güncelle (fiyat, KDV, birim, özellik vb.)</option></select>') + '</div>' +
     '<div style="display:grid;gap:6px;margin-bottom:10px"><label class="chk"><input type="checkbox" name="autoBc"> Barkodu boş olan yeni ürünlere otomatik EAN-13 ver</label>' +
-    '<label class="chk"><input type="checkbox" name="autoAttr"> Tanımsız özellik değerlerini otomatik ekle (kapalıysa hata verir)</label></div>' +
-    '<div class="hint">İlk satır başlık olmalı, sütun sırası önemli değil. Sütunlar: <b>Ürün adı</b> (zorunlu), Ürün kodu, Barkod, Birim, Alış fiyatı, Satış fiyatı, KDV, Kritik stok, Açılış stoğu' + (names.length ? ', ' + names.map(esc).join(', ') : '') + '. Fiyatlar KDV dahil girilir. Barkod sütununu Excel’de Metin biçimine çevirin. Açılış stoğu yalnızca yeni ürünlerde uygulanır, güncellemede stok değişmez. <button type="button" class="btn sm" data-act="impTemplate">Şablonu indir (CSV)</button></div>',
+    '<label class="chk"><input type="checkbox" name="autoAttr"> Tanımsız özellik, renk ve beden değerlerini otomatik ekle (kapalıysa hata verir)</label></div>' +
+    '<div class="hint">İlk satır başlık olmalı, sütun sırası önemli değil. Sütunlar: <b>Ürün adı</b> (zorunlu), Ürün kodu, Barkod, Birim, Alış fiyatı, Perakende fiyatı, Toptan fiyatı, KDV, Kritik stok, Açılış stoğu' + (names.length ? ', ' + names.map(esc).join(', ') : '') + '. Fiyatlar KDV dahil girilir. Barkod sütununu Excel’de Metin biçimine çevirin. Açılış stoğu yalnızca yeni ürünlerde uygulanır, güncellemede stok değişmez. <button type="button" class="btn sm" data-act="impTemplate">Şablonu indir (CSV)</button></div>' +
+    '<div class="hint" style="margin-top:8px"><b>Renk ve beden:</b> değerler Özellikler sekmesindeki Renkler ve Bedenler listesiyle eşleştirilir (kod veya açıklama yazabilirsiniz); listede olmayanlar için yukarıdaki “otomatik ekle” kutusunu işaretleyin. İki yol var. (1) Her varyant ayrı satır: <b>Renk (varyant)</b> ve/veya <b>Beden (varyant)</b> sütunlarını doldurun; ürün adı (varsa ürün kodu) aynı olan satırlar tek ürün olur. O satırdaki <b>Barkod</b> varyantın barkodu, <b>Açılış stoğu</b> varyantın stoğudur. (2) Tek satırda <b>Renkler</b> ve <b>Bedenler</b> sütunları, virgülle (Kırmızı, Mavi). Ürün-düzeyi bilgiler (fiyat, KDV vb.) ilk satırdan alınır.' + (names.some(function(n){ return nz(n) === 'renk' || nz(n) === 'beden'; }) ? ' <b>Dikkat:</b> özelliklerinizde “Renk” veya “Beden” var; aynı başlıklı sütun özellik olarak okunur, varyant için “Renk (varyant)” / “Beden (varyant)” başlığını kullanın.' : '') + '</div>',
     function(f){
       var file = f.file && f.file.size ? f.file : null, paste = (f.paste || '').trim();
       if(!file && !paste){ toast('Bir dosya seçin ya da Excel’den kopyaladığınız tabloyu yapıştırın', 'err'); return false; }
@@ -2182,15 +2687,17 @@ A.impExcel = function(){
 
 /* ---------- Bağlı iade ---------- */
 function origDoc(id){ return db.docs.find(function(d){ return d.id === id; }); }
-function returnedQty(origId, pid){
-  return sum(db.docs.filter(function(d){ return d.ref === origId && (d.type === 'sret' || d.type === 'pret'); }), function(d){ return sum(d.lines.filter(function(l){ return l.pid === pid; }), function(l){ return l.qty; }); });
+function returnedQty(origId, pid, cl, sz){
+  cl = nv(cl); sz = nv(sz);
+  return sum(db.docs.filter(function(d){ return d.ref === origId && (d.type === 'sret' || d.type === 'pret'); }), function(d){ return sum(d.lines.filter(function(l){ return l.pid === pid && nv(l.cl) === cl && nv(l.sz) === sz; }), function(l){ return l.qty; }); });
 }
-function remainingQty(origId, pid){
+function remainingQty(origId, pid, cl, sz){
   var o = origDoc(origId); if(!o) return 0;
-  var sold = sum(o.lines.filter(function(l){ return l.pid === pid; }), function(l){ return l.qty; });
-  return r2(sold - returnedQty(origId, pid));
+  cl = nv(cl); sz = nv(sz);
+  var sold = sum(o.lines.filter(function(l){ return l.pid === pid && nv(l.cl) === cl && nv(l.sz) === sz; }), function(l){ return l.qty; });
+  return r2(sold - returnedQty(origId, pid, cl, sz));
 }
-function docHasRemaining(o){ return o.lines.some(function(l){ return remainingQty(o.id, l.pid) > 0.0001; }); }
+function docHasRemaining(o){ return o.lines.some(function(l){ return remainingQty(o.id, l.pid, l.cl, l.sz) > 0.0001; }); }
 function docProducts(id){
   var o = origDoc(id), seen = {}, out = [];
   if(o) o.lines.forEach(function(l){ var p = prod(l.pid); if(p && !seen[p.id]){ seen[p.id] = 1; out.push(p); } });
@@ -2207,10 +2714,12 @@ function applyRef(type, ed){
   ed.cariId = o.cariId || '';
   var ls = [], seen = {};
   o.lines.forEach(function(l){
-    if(seen[l.pid]) return; seen[l.pid] = 1;
-    var rem = remainingQty(o.id, l.pid); if(rem <= 0.0001) return;
-    var tl = o.lines.filter(function(x){ return x.pid === l.pid; }), q = sum(tl, function(x){ return x.qty; }), net = sum(tl, function(x){ return lt(x); });
-    ls.push({pid:l.pid, qty:String(rem), price:String(Math.round(net / q * 10000) / 10000), pm:true});
+    var k = vkey(l); if(seen[k]) return; seen[k] = 1;
+    var rem = remainingQty(o.id, l.pid, l.cl, l.sz); if(rem <= 0.0001) return;
+    var tl = o.lines.filter(function(x){ return vkey(x) === k; }), q = sum(tl, function(x){ return x.qty; }), net = sum(tl, function(x){ return lt(x); });
+    var row = {pid:l.pid, qty:String(rem), price:String(Math.round(net / q * 10000) / 10000), pm:true};
+    if(l.cl) row.cl = l.cl; if(l.sz) row.sz = l.sz;
+    ls.push(row);
   });
   ed.lines = ls.length ? ls : [{pid:'', qty:1, price:''}];
   ed.pm = 'ref';
@@ -2233,6 +2742,33 @@ A.toggleNav = function(){ document.body.classList.toggle('navopen'); };
 
 /* ---------- Menü adları ve fiş tasarımı ayarları ---------- */
 function menuLabel(t){ var m = db.settings && db.settings.menus; return (m && m[t[0]]) ? m[t[0]] : t[1]; }
+function eanInfoText(pf, valid){
+  if(!valid) return '<span class="neg">Başlangıç 1 ile 9 arası haneli rakamlardan oluşmalı.</span>';
+  var st = eanStats(pf), left = st.cap - st.count, bits = [];
+  bits.push('Başlangıç <b>' + esc(pf) + '</b> · sıra numarası ' + st.n + ' hane · bu başlangıçla en fazla <b>' + st.cap.toLocaleString('tr-TR') + '</b> barkod üretilebilir' + (st.count ? ' (şu an ' + st.count.toLocaleString('tr-TR') + ' tanesi kullanımda)' : '') + '.');
+  if(st.cap < 1000) bits.push('<span class="neg">Sıra numarası çok kısa; yalnızca ' + st.cap.toLocaleString('tr-TR') + ' barkod üretilebilir. Başlangıcı kısaltmanız önerilir.</span>');
+  if(!/^2\d/.test(pf)) bits.push('<span class="neg">Dikkat: 20–29 ile başlayan EAN-13 numaraları mağaza içi kullanım için ayrılmıştır. Başka bir başlangıç, piyasadaki gerçek ürünlerin barkoduyla çakışabilir ve okutunca yanlış ürün gelmesine yol açabilir. Yalnızca GS1’den aldığınız bir şirket önekiniz varsa kullanın.</span>');
+  return bits.join('<br>');
+}
+function eanCard(){
+  var pf = eanPrefix();
+  return '<div class="card"><h3>Barkod (EAN-13) başlangıcı</h3><p class="muted" style="margin-top:0">“Otomatik EAN-13”, toplu barkod, varyant barkodu ve Excel aktarımı bu başlangıçla başlayan numaralar üretir. Başlangıçtan sonrası sıra numarasıdır, son hane (kontrol hanesi) otomatik hesaplanır. Daha önce verilmiş barkodlar değişmez; değiştirirseniz yeni numaralar yeni başlangıçla ve 1’den başlar.</p>' +
+    '<div class="cols">' + fld('Başlangıç (yalnızca rakam, 1-9 hane)', '<input id="s_ean" data-ean="1" inputmode="numeric" maxlength="9" autocomplete="off" value="' + esc(pf) + '">') + fld('Sıradaki numara (örnek)', '<input id="s_ean_next" value="' + esc(nextEanFor(pf, null, true)) + '" disabled>') + '</div>' +
+    '<div class="muted" id="ean_info" style="font-size:13px;margin-bottom:8px">' + eanInfoText(pf, true) + '</div>' +
+    '<div class="row-end" style="justify-content:flex-start"><button class="btn pri" data-act="saveEan">Kaydet</button><button class="btn" data-act="eanReset">Varsayılana dön (29)</button></div></div>';
+}
+function eanLive(inp){
+  var v = String(inp.value || '').trim(), ok = /^\d{1,9}$/.test(v);
+  var nx = $('#s_ean_next'), inf = $('#ean_info');
+  if(nx) nx.value = ok ? nextEanFor(v, null, true) : '';
+  if(inf) inf.innerHTML = eanInfoText(ok ? v : '', ok);
+}
+A.saveEan = function(){
+  var v = ($('#s_ean').value || '').trim();
+  if(!/^\d{1,9}$/.test(v)){ toast('Başlangıç 1 ile 9 arası haneli rakamlardan oluşmalı', 'err'); return; }
+  db.settings.eanPrefix = v; commit(); toast('Barkod başlangıcı kaydedildi: ' + v);
+};
+A.eanReset = function(){ delete db.settings.eanPrefix; commit(); toast('Varsayılan başlangıca (29) dönüldü'); };
 function menusCard(){
   var m = (db.settings && db.settings.menus) || {};
   return '<div class="card"><h3>Menü adları</h3><p class="muted" style="margin-top:0">Soldaki menüde görünen adları değiştirebilirsiniz. Boş bırakılan ad varsayılan adına döner.</p><div class="cols3">' +
@@ -2310,6 +2846,7 @@ function lblCss(o){
     '.lbl2 .l-co,.lbl2 .l-at,.lbl2 .l-cd{font-size:' + o.smallSize + 'pt;color:#333;max-width:100%}' +
     '.lbl2 .l-lg{max-height:7mm;max-width:100%;object-fit:contain}' +
     '.lbl2 .l-nm{font-size:' + o.nameSize + 'pt;font-weight:700;max-width:100%;display:-webkit-box;-webkit-line-clamp:' + o.nameLines + ';-webkit-box-orient:vertical;overflow:hidden;word-break:break-word}' +
+    '.lbl2 .l-vr{font-size:' + o.smallSize + 'pt;font-weight:700;max-width:100%}' +
     '.lbl2 .l-bc{max-width:100%;line-height:0;margin:0.6mm 0}' +
     '.lbl2 .l-bc svg{max-width:100%}' +
     '.lbl2 .l-pr{font-size:' + o.priceSize + 'pt;font-weight:700}';
@@ -2324,17 +2861,18 @@ function applyLblCss(o){
   if(!st){ st = document.createElement('style'); st.id = 'lblstyle2'; document.head.appendChild(st); }
   st.textContent = lblCss(o);
 }
-function labelHTML(p, o){
-  var st = db.settings || {}, h = '<div class="lbl2">';
+function labelHTML(p, o, v){
+  var st = db.settings || {}, h = '<div class="lbl2">', bc = v ? v.bc : p.barcode;
   if(o.logo && logoSrc()) h += '<img class="l-lg" src="' + logoSrc() + '" alt="">';
   if(o.company && st.name) h += '<div class="l-co">' + esc(st.name) + '</div>';
   if(o.name) h += '<div class="l-nm">' + esc(p.name) + '</div>';
+  if(v && (v.cl || v.sz)) h += '<div class="l-vr">' + esc(varLabel(v.cl, v.sz)) + '</div>';
   var parts = [];
   o.attrs.forEach(function(on, i){ if(on && p.attrs && p.attrs[i]) parts.push(attrLabel(i, p.attrs[i])); });
   if(parts.length) h += '<div class="l-at">' + esc(parts.join(' · ')) + '</div>';
-  if(o.barcode && p.barcode){
-    var sv = ean13Svg(p.barcode, {digits:o.digits, wmm:Math.min(o.bw, Math.max(10, o.w - 2 * o.pad)), hmm:o.bh});
-    h += '<div class="l-bc">' + (sv || '<b style="font-size:' + o.smallSize + 'pt;line-height:1.2">' + esc(p.barcode) + '</b>') + '</div>';
+  if(o.barcode && bc){
+    var sv = ean13Svg(bc, {digits:o.digits, wmm:Math.min(o.bw, Math.max(10, o.w - 2 * o.pad)), hmm:o.bh});
+    h += '<div class="l-bc">' + (sv || '<b style="font-size:' + o.smallSize + 'pt;line-height:1.2">' + esc(bc) + '</b>') + '</div>';
   }
   if(o.code && p.code) h += '<div class="l-cd">' + esc(p.code) + '</div>';
   if(o.price) h += '<div class="l-pr">' + money(p.price) + '</div>';
@@ -2435,7 +2973,7 @@ A.bbAll = function(d){
 A.bulkBarcode = function(){
   var all = db.products.slice().sort(function(a, b){ return a.name.localeCompare(b.name, 'tr'); });
   if(!all.length){ toast('Önce ürün ekleyin', 'err'); return; }
-  var ps = all.filter(function(p){ return !p.barcode; }), have = all.length - ps.length;
+  var ps = all.filter(function(p){ return missingBcCount(p) > 0; }), have = all.length - ps.length;
   if(!ps.length){ toast('Tüm ürünlerin barkodu zaten var', 'err'); return; }
   var names = attrNames();
   var filt = names.map(function(n, i){
@@ -2445,10 +2983,10 @@ A.bulkBarcode = function(){
   var rows = ps.map(function(p){
     var tx = nz(p.name + ' ' + (p.code || '') + ' ' + attrText(p));
     var ad = [0, 1, 2, 3, 4].map(function(i){ return ' data-a' + i + '="' + esc((p.attrs || [])[i] || '') + '"'; }).join('');
-    return '<tr data-bb="' + esc(tx) + '"' + ad + '><td><input type="checkbox" name="b_' + p.id + '" checked style="width:auto;min-height:0"></td><td>' + esc(p.name) + (attrTags(p) ? '<div style="margin-top:2px">' + attrTags(p) + '</div>' : '') + '</td><td class="muted">' + esc(p.code || '') + '</td></tr>';
+    return '<tr data-bb="' + esc(tx) + '"' + ad + '><td><input type="checkbox" name="b_' + p.id + '" checked style="width:auto;min-height:0"></td><td>' + esc(p.name) + (hasVar(p) ? ' <span class="muted" style="font-size:12px">· ' + missingBcCount(p) + ' varyantın barkodu eksik</span>' : '') + (attrTags(p) ? '<div style="margin-top:2px">' + attrTags(p) + '</div>' : '') + '</td><td class="muted">' + esc(p.code || '') + '</td></tr>';
   }).join('');
   modal('Toplu barkod ata',
-    '<div class="hint">Barkodu olmayan <b>' + ps.length + '</b> ürün listeleniyor' + (have ? ' (' + have + ' ürünün barkodu var, listede yok, onlara dokunulmaz)' : '') + '. Seçilenlere sırayla, <b>29</b> ile başlayan mağaza içi kullanım için ayrılmış EAN-13 numaraları verilir. Barkod kontrol hanesi otomatik hesaplanır ve her numara benzersizdir.</div>' +
+    '<div class="hint">Barkodu olmayan <b>' + ps.length + '</b> ürün listeleniyor' + (have ? ' (' + have + ' ürünün barkodu var, listede yok, onlara dokunulmaz)' : '') + '. Seçilenlere sırayla, <b>' + esc(eanPrefix()) + '</b> ile başlayan EAN-13 numaraları verilir (başlangıcı Ayarlar &gt; Barkod başlangıcı bölümünden değiştirebilirsiniz). Renk/bedenli ürünlerde her varyantın eksik barkodu ayrı verilir. Barkod kontrol hanesi otomatik hesaplanır ve her numara benzersizdir.</div>' +
     fld('Ara', '<input id="bbq" placeholder="Ad, kod veya özellik" autocomplete="off">') +
     (filt ? '<div class="chips" style="margin-bottom:8px">' + filt + '</div>' : '') +
     '<div class="chips" style="margin-bottom:8px;align-items:center"><button type="button" class="btn sm" data-act="bbAll" data-v="1">Görünenleri seç</button><button type="button" class="btn sm" data-act="bbAll" data-v="0">Seçimi temizle</button><span id="bbcount" class="muted" style="font-size:13px">' + ps.length + ' ürün listeleniyor</span></div>' +
@@ -2462,19 +3000,26 @@ A.bulkBarcode = function(){
         if(c && c.checked) ids.push(c.name.slice(2));
       });
       if(!ids.length){ toast('Barkod atanacak ürün seçin', 'err'); return false; }
-      var first = '', last = '', done = [];
+      var first = '', last = '', done = [], nProd = 0, nVar = 0;
       ids.forEach(function(id){
-        var p = prod(id);
-        if(p && !p.barcode){ p.barcode = nextEan(); if(!first) first = p.barcode; last = p.barcode; done.push(id); }
+        var p = prod(id); if(!p) return;
+        var hv = hasVar(p), ks = assignBc(p);
+        if(!ks.length) return;
+        nProd++; if(hv) nVar += ks.length;
+        ks.forEach(function(k){
+          var sp = k.indexOf('~'), b = sp < 0 ? p.barcode : (p.vbc || {})[k.slice(sp + 1)];
+          if(!first) first = b; last = b; done.push(k);
+        });
       });
       lastBulk = done;
       commit();
-      setTimeout(function(){ bbDone(done.length, first, last); }, 0);
+      setTimeout(function(){ bbDone(nProd, first, last, nVar, done.length); }, 0);
     }, 'Barkod ata', null, true);
 };
-function bbDone(n, first, last){
+function bbDone(n, first, last, nVar, nBc){
+  var cnt = nBc || n;
   modal('Barkodlar atandı',
-    '<div class="hint"><b>' + n + '</b> ürüne EAN-13 barkod verildi.' + (n > 1 ? '<br>İlk numara: ' + esc(first) + '<br>Son numara: ' + esc(last) : '<br>Numara: ' + esc(first)) + '</div>' +
+    '<div class="hint">' + (nVar ? '<b>' + cnt + '</b> EAN-13 barkod verildi (' + n + ' ürün, ' + nVar + ' varyant barkodu).' : '<b>' + n + '</b> ürüne EAN-13 barkod verildi.') + (cnt > 1 ? '<br>İlk numara: ' + esc(first) + '<br>Son numara: ' + esc(last) : '<br>Numara: ' + esc(first)) + '</div>' +
     '<div class="muted">Bu ürünlerin etiketlerini şimdi oluşturabilirsiniz.</div>',
     null, null, '<button type="button" class="btn pri" data-act="bbLabels">Etiketlerini oluştur</button>');
 }
@@ -2492,33 +3037,38 @@ function lblFilter(){
     tr.style.display = ok ? '' : 'none';
   });
 }
-var lblPre = [];
+var lblPre = [], lblPreQ = '';
+function lblItemsOf(p){                                        // etiket satırları: varyantlı üründe her varyant, değilse ürünün kendisi
+  if(hasVar(p)) return varList(p).map(function(v){ return {suf:p.id + '~' + v.key, p:p, v:{cl:v.cl, sz:v.sz, bc:v.bc}, bc:v.bc, label:v.label}; });
+  return [{suf:p.id, p:p, v:null, bc:p.barcode || '', label:''}];
+}
 A.batchLabels = function(){
   if(!db.products.length){ toast('Önce ürün ekleyin', 'err'); return; }
-  var pre = lblPre; lblPre = [];
+  var pre = lblPre, preQ = lblPreQ; lblPre = []; lblPreQ = '';
   var ps = db.products.slice().sort(function(a, b){ return a.name.localeCompare(b.name, 'tr'); }), names = attrNames();
-  var noBc = ps.filter(function(p){ return !p.barcode; }).length;
+  var all = []; ps.forEach(function(p){ all = all.concat(lblItemsOf(p)); });
+  var noBc = all.filter(function(it){ return !it.bc; }).length, anyVar = ps.some(hasVar);
   var filt = names.map(function(n, i){
     if(!n || !attrVals(i).length) return '';
     return '<select id="lblf' + i + '" data-lblf="' + i + '" style="max-width:190px"><option value="">' + esc(n) + ': hepsi</option>' + attrVals(i).map(function(v){ return '<option value="' + esc(v.c) + '">' + esc(v.c) + (v.d && v.d !== v.c ? ' – ' + esc(v.d) : '') + '</option>'; }).join('') + '</select>';
   }).join('');
-  var rows = ps.map(function(p){
-    var tx = (p.name + ' ' + (p.code || '') + ' ' + (p.barcode || '') + ' ' + attrText(p)).toLowerCase();
+  var rows = all.map(function(it){
+    var p = it.p, tx = (p.name + ' ' + (p.code || '') + ' ' + it.bc + ' ' + it.label + ' ' + attrText(p)).toLowerCase();
     var ad = [0, 1, 2, 3, 4].map(function(i){ return ' data-a' + i + '="' + esc((p.attrs || [])[i] || '') + '"'; }).join('');
-    return '<tr data-lbl="' + esc(tx) + '"' + ad + '><td><input type="checkbox" name="s_' + p.id + '"' + (p.barcode ? '' : ' disabled') + (pre.indexOf(p.id) >= 0 ? ' checked' : '') + ' style="width:auto;min-height:0"></td><td>' + esc(p.name) + (attrTags(p) ? '<div style="margin-top:2px">' + attrTags(p) + '</div>' : '') + '</td><td class="muted">' + (p.barcode ? esc(p.barcode) : 'Barkod yok') + '</td><td class="r">' + (p.barcode ? '<input type="number" name="n_' + p.id + '" value="1" step="1" style="width:76px" aria-label="Etiket adedi">' : '') + '</td></tr>';
+    return '<tr data-lbl="' + esc(tx) + '"' + ad + '><td><input type="checkbox" name="s_' + esc(it.suf) + '"' + (it.bc ? '' : ' disabled') + (pre.indexOf(it.suf) >= 0 ? ' checked' : '') + ' style="width:auto;min-height:0"></td><td>' + esc(p.name) + (it.label ? ' <span class="tag move">' + esc(it.label) + '</span>' : '') + (attrTags(p) ? '<div style="margin-top:2px">' + attrTags(p) + '</div>' : '') + '</td><td class="muted">' + (it.bc ? esc(it.bc) : 'Barkod yok') + '</td><td class="r">' + (it.bc ? '<input type="number" name="n_' + esc(it.suf) + '" value="1" step="1" style="width:76px" aria-label="Etiket adedi">' : '') + '</td></tr>';
   }).join('');
   modal('Toplu etiket',
-    (noBc ? '<div class="hint">' + noBc + ' ürünün barkodu yok, etiketi basılamaz. <button type="button" class="btn sm" data-act="autoBarcodes">Otomatik EAN-13 ata</button></div>' : '') +
-    '<div class="cols">' + fld('Ara', '<input id="lblq" placeholder="Ad, kod, barkod veya özellik" autocomplete="off">') + fld('Etiket tasarımı', '<div class="muted" style="padding-top:10px;font-size:13px">' + esc(lblSummary(lblOpt())) + (can('settings.edit') ? ' · değiştirmek için Ayarlar, Etiket tasarımı' : '') + '</div>') + '</div>' +
+    (noBc ? '<div class="hint">' + noBc + (anyVar ? ' ürün/varyantın' : ' ürünün') + ' barkodu yok, etiketi basılamaz. <button type="button" class="btn sm" data-act="autoBarcodes">Otomatik EAN-13 ata</button></div>' : '') +
+    '<div class="cols">' + fld('Ara', '<input id="lblq" placeholder="Ad, kod, barkod, renk/beden veya özellik" autocomplete="off">') + fld('Etiket tasarımı', '<div class="muted" style="padding-top:10px;font-size:13px">' + esc(lblSummary(lblOpt())) + (can('settings.edit') ? ' · değiştirmek için Ayarlar, Etiket tasarımı' : '') + '</div>') + '</div>' +
     (filt ? '<div class="chips" style="margin-bottom:8px">' + filt + '</div>' : '') +
     '<div class="chips" style="margin-bottom:8px;align-items:center"><button type="button" class="btn sm" data-act="lblAll" data-v="1">Görünenleri seç</button><button type="button" class="btn sm" data-act="lblAll" data-v="0">Seçimi temizle</button><button type="button" class="btn sm" data-act="lblStock">Adet = stok</button><label class="chk"><input type="checkbox" name="showPrice"' + (lblOpt().price ? ' checked' : '') + '> Fiyat</label><label class="chk"><input type="checkbox" name="showCode"' + (lblOpt().code ? ' checked' : '') + '> Ürün kodu</label></div>' +
     '<div class="tbl" style="max-height:320px;overflow:auto"><table><thead><tr><th></th><th>Ürün</th><th>Barkod</th><th class="r">Adet</th></tr></thead><tbody>' + rows + '</tbody></table></div>',
     function(f){
       var items = [], total = 0;
-      ps.forEach(function(p){
-        if(f['s_' + p.id] && p.barcode){
-          var n = Math.max(1, Math.min(200, Math.floor(num(f['n_' + p.id])) || 1));
-          items.push({p:p, n:n}); total += n;
+      all.forEach(function(it){
+        if(f['s_' + it.suf] && it.bc){
+          var n = Math.max(1, Math.min(200, Math.floor(num(f['n_' + it.suf])) || 1));
+          items.push({p:it.p, v:it.v, n:n}); total += n;
         }
       });
       if(!items.length){ toast('Etiket için en az bir ürün seçin', 'err'); return false; }
@@ -2526,6 +3076,7 @@ A.batchLabels = function(){
       var pr = !!f.showPrice, cd = !!f.showCode;
       setTimeout(function(){ showLabels(items, pr, cd); }, 0);
     }, 'Etiketleri oluştur', null, true);
+  if(preQ){ var qi = $('#lblq'); if(qi){ qi.value = preQ; lblFilter(); } }
 };
 function showLabels(items, price, code, oo){
   var o = oo || lblOpt();
@@ -2534,7 +3085,7 @@ function showLabels(items, price, code, oo){
   applyLblCss(o);
   var total = 0, h = '<div class="lbls2">';
   items.forEach(function(it){
-    var one = labelHTML(it.p, o);
+    var one = labelHTML(it.p, o, it.v);
     for(var n = 0; n < it.n; n++) h += one;
     total += it.n;
   });
@@ -2554,15 +3105,17 @@ A.lblStock = function(){
   document.querySelectorAll('#mf tr[data-lbl]').forEach(function(tr){
     if(tr.style.display === 'none') return;
     var c = tr.querySelector('input[type=checkbox]'); if(!c || c.disabled) return;
-    var q = tr.querySelector('input[type=number]'), id = c.name.slice(2);
-    c.checked = true; if(q) q.value = Math.max(1, Math.round(stockOf(id)));
+    var q = tr.querySelector('input[type=number]'), id = c.name.slice(2), sp = id.indexOf('~'), st;
+    if(sp < 0) st = stockOf(id); else { var ab = id.slice(sp + 1).split('|'); st = stockV(id.slice(0, sp), ab[0], ab[1]); }
+    c.checked = true; if(q) q.value = Math.max(1, Math.round(st));
   });
 };
 A.autoBarcodes = function(){
-  var n = db.products.filter(function(p){ return !p.barcode; }).length; if(!n) return;
-  confirmBox(n + ' ürüne otomatik EAN-13 barkod atanacak.', function(){
-    db.products.forEach(function(p){ if(!p.barcode) p.barcode = nextEan(); });
-    commit(); toast(n + ' ürüne barkod atandı');
+  var n = sum(db.products, missingBcCount); if(!n) return;
+  var anyVar = db.products.some(hasVar);
+  confirmBox(n + (anyVar ? ' ürün/varyanta' : ' ürüne') + ' otomatik EAN-13 barkod atanacak.', function(){
+    db.products.forEach(function(p){ assignBc(p); });
+    commit(); toast(n + (anyVar ? ' ürün/varyanta' : ' ürüne') + ' barkod atandı');
     setTimeout(A.batchLabels, 0);
   }, 'Ata');
 };
@@ -2619,7 +3172,7 @@ function rcptDoc(x){
   x.lines.forEach(function(l){
     var p = prod(l.pid), g = lg(l);
     gSum += g; cSum += num(l.cDisc); mSum += num(l.mDisc); dSum += num(l.gDisc);
-    h += '<div>' + esc(p ? p.name : '(silinmiş)') + '</div><div class="rr"><span>' + qf(l.qty) + ' ' + esc(p ? p.unit : '') + ' x ' + money(l.price) + ' (%' + num(l.vat) + ')</span><span>' + money(g) + '</span></div>';
+    h += '<div>' + esc(p ? p.name : '(silinmiş)') + (l.cl || l.sz ? ' (' + esc(varLabel(l.cl, l.sz)) + ')' : '') + '</div><div class="rr"><span>' + qf(l.qty) + ' ' + esc(p ? p.unit : '') + ' x ' + money(l.price) + ' (%' + num(l.vat) + ')</span><span>' + money(g) + '</span></div>';
     if(num(l.cDisc) > 0) h += '<div class="rr"><span>&nbsp;&nbsp;Kampanya: ' + esc(l.camp || '') + '</span><span>−' + money(l.cDisc) + '</span></div>';
     if(num(l.mDisc) > 0) h += '<div class="rr"><span>&nbsp;&nbsp;İskonto' + (l.md && l.md.t === '%' ? ' %' + qf(l.md.v) : '') + '</span><span>−' + money(l.mDisc) + '</span></div>';
   });
@@ -2639,7 +3192,7 @@ function rcptDoc(x){
   h += '<div class="rr b"><span>TOPLAM</span><span>' + money(x.total) + '</span></div>';
   h += '<div class="rr"><span>' + T.paidLabel + '</span><span>' + money(x.paid) + '</span></div>';
   if(rc.pays) Object.keys(pp).forEach(function(m){ h += '<div class="rr"><span>&nbsp;&nbsp;' + esc(m) + '</span><span>' + money(pp[m]) + '</span></div>'; });
-  if(rest > 0.004) h += '<div class="rr"><span>' + (x.type === 'sale' ? 'Kalan (veresiye)' : 'Kalan (cari hesaba)') + '</span><span>' + money(rest) + '</span></div>';
+  if(rest > 0.004) h += '<div class="rr"><span>' + 'Kalan (cari hesaba aktarıldı)' + '</span><span>' + money(rest) + '</span></div>';
   if(rc.disc && disc > 0.004 && x.type === 'sale') h += '<div class="c" style="margin-top:4px">Bu alışverişte ' + money(disc) + ' indirim kazandınız.</div>';
   if(x.note) h += '<div>' + esc(x.note) + '</div>';
   return h + rcptFoot(x.type);
