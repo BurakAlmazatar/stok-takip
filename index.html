@@ -190,6 +190,11 @@ label.f>input,label.f>select,label.f>textarea{margin-top:4px;font-weight:400}
 .vbi{width:100%;min-width:150px}
 .varpick{margin-bottom:8px}
 .pick.vp{max-height:140px}
+.payrow{display:flex;gap:6px}.payrow input{flex:1;min-width:0}.payrow select{width:88px;flex:none}
+.pq{font-size:12px;min-height:16px;margin-top:2px}
+.fxbox{margin:6px 0 10px;border:1px solid var(--border);border-radius:10px;padding:8px 10px;background:var(--surface-2)}
+.fxbox summary{cursor:pointer;font-weight:600;font-size:13px}
+.chgline{margin-top:4px}.chgsel{margin-top:4px;display:flex;gap:6px;align-items:center;flex-wrap:wrap}.chgsel select{width:auto;min-width:110px}
 .vsel{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}
 .vsel select{flex:1 1 120px;min-width:0}
 .cpdet summary{cursor:pointer;font-weight:600;font-size:13px;padding:6px 0}
@@ -231,8 +236,8 @@ label.f>input,label.f>select,label.f>textarea{margin-top:4px;font-weight:400}
 <script>
 /* ---------- Veri ---------- */
 var KEY = 'stokcari_v1';
-var APP_VERSION = '2026.10.25-6';
-function defaults(){ return {products:[],caris:[],docs:[],payments:[],moves:[],counters:{sale:0,purchase:0},seq:1,users:[],campaigns:[],settings:{name:'',phone:'',address:'',taxNo:'',footer:'',logo:'',logoRcpt:false,attrVals:[[],[],[],[],[]]}}; }
+var APP_VERSION = '2026.10.25-7';
+function defaults(){ return {products:[],caris:[],docs:[],payments:[],moves:[],counters:{sale:0,purchase:0},seq:1,users:[],campaigns:[],rates:[],settings:{name:'',phone:'',address:'',taxNo:'',footer:'',logo:'',logoRcpt:false,attrVals:[[],[],[],[],[]]}}; }
 function load(){
   try{ var s = localStorage.getItem(KEY); if(s){ var o = JSON.parse(s); return Object.assign(defaults(), o); } }catch(e){}
   return defaults();
@@ -262,14 +267,15 @@ var PERMS = [
   {id:'reports', label:'Raporlar', items:[['view', 'Menüyü ve raporları görebilir'], ['profit', 'Kâr bilgilerini görebilir']]},
   {id:'payrep', label:'Ödeme Raporu', items:[['view', 'Menüyü ve raporu görebilir']]},
   {id:'settings', label:'Ayarlar', items:[['view', 'Menüyü görebilir (tema)'], ['edit', 'Firma bilgilerini ve logoyu değiştirebilir']]},
-  {id:'cost', label:'Maliyet bilgisi', items:[['view', 'Alış fiyatlarını ve stok değerini görebilir']]}
+  {id:'cost', label:'Maliyet bilgisi', items:[['view', 'Alış fiyatlarını ve stok değerini görebilir']]},
+  {id:'fx', label:'Döviz ve kurlar', items:[['use', 'Dövizli işlem yapabilir (belge ve ödeme)'], ['rate', 'Kuru elle yazabilir, kur kaydı ekleyebilir ve kurları güncelleyebilir']]}
 ];
 var PERM_ALIAS = {cost:'cost.view', stockmove:'stock.move', payout:'payments.payout', collect:'payments.collect', addCari:'caris.add', sell:'sales.new', refund:'sales.refund', buy:'purchases.new'};
 var PERM_TPL = {
   kasiyer:['panel.view', 'sales.view', 'sales.new', 'sales.refund', 'products.view', 'stock.view', 'caris.view', 'caris.add', 'payments.view', 'payments.collect'],
-  satis:['panel.view', 'sales.view', 'sales.new', 'sales.discount', 'sales.price', 'sales.refund', 'products.view', 'campaigns.view', 'stock.view', 'caris.view', 'caris.add', 'payments.view', 'payments.collect'],
+  satis:['panel.view', 'sales.view', 'sales.new', 'sales.discount', 'sales.price', 'sales.refund', 'products.view', 'campaigns.view', 'stock.view', 'caris.view', 'caris.add', 'payments.view', 'payments.collect', 'fx.use'],
   depo:['panel.view', 'products.view', 'products.edit', 'products.import', 'products.labels', 'attrs.view', 'stock.view', 'stock.move', 'purchases.view', 'purchases.new', 'purchases.refund', 'cost.view'],
-  muhasebe:['panel.view', 'panel.cash', 'sales.view', 'purchases.view', 'caris.view', 'payments.view', 'payments.collect', 'payments.payout', 'reports.view', 'reports.profit', 'payrep.view', 'cost.view']
+  muhasebe:['panel.view', 'panel.cash', 'sales.view', 'purchases.view', 'caris.view', 'payments.view', 'payments.collect', 'payments.payout', 'reports.view', 'reports.profit', 'payrep.view', 'cost.view', 'fx.use', 'fx.rate']
 };
 function allPerms(){ var a = []; PERMS.forEach(function(g){ g.items.forEach(function(it){ a.push(g.id + '.' + it[0]); }); }); return a; }
 function legacyStaffPerms(){
@@ -307,7 +313,7 @@ var ACT_PERM = {
   newCari:'caris.add', quickCari:'caris.add', editCari:'caris.edit', delCari:'caris.delete',
   delPay:'payments.delete',
   repPreset:'reports.view', repType:'reports.view', copyRep:'reports.view', repMethod:'payrep.view', copyPay:'payrep.view',
-  newCamp:'campaigns.edit', editCamp:'campaigns.edit', campPick:'campaigns.edit', cariPrices:'caris.edit', cpClear:'caris.edit', addCat:'attrs.edit', editCat:'attrs.edit', delCat:'attrs.edit', moveCat:'attrs.edit', catQuick:'attrs.edit', togCamp:'campaigns.edit', delCamp:'campaigns.edit',
+  newCamp:'campaigns.edit', editCamp:'campaigns.edit', campPick:'campaigns.edit', cariPrices:'caris.edit', cpClear:'caris.edit', fxAuto:'fx.use', fxUpdate:'fx.rate', fxAdd:'fx.rate', fxDel:'fx.rate', fxRules:'settings.edit', fxRulesReset:'settings.edit', addCat:'attrs.edit', editCat:'attrs.edit', delCat:'attrs.edit', moveCat:'attrs.edit', catQuick:'attrs.edit', togCamp:'campaigns.edit', delCamp:'campaigns.edit',
   saveAttrs:'attrs.edit', addVal:'attrs.edit', editVal:'attrs.edit', delVal:'attrs.edit',
   saveName:'settings.edit', rmLogo:'settings.edit', saveRc:'settings.edit', saveLbl:'settings.edit', saveEan:'settings.edit', eanReset:'settings.edit', lblReset:'settings.edit', lblTest:'settings.edit', rcReset:'settings.edit', saveMenus:'settings.edit', menusReset:'settings.edit',
   exportData:'admin', importData:'admin', downloadBackup:'admin', demo:'admin', wipe:'admin', newUser:'admin', editUser:'admin', delUser:'admin', permTpl:'admin'
@@ -354,6 +360,44 @@ function ymd(d){ return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(
 function today(){ return ymd(new Date()); }
 function fd(s){ if(!s) return ''; var p = s.split('-'); return p[2] + '.' + p[1] + '.' + p[0]; }
 function sum(arr, f){ return arr.reduce(function(a, x){ return a + f(x); }, 0); }
+/* ---------- Döviz ve kurlar ---------- */
+var FX_CURS = ['USD', 'EUR'], FX_SYM = {TRY:'₺', USD:'$', EUR:'€'};
+var FX_TYPES = [['fb', 'Döviz alış'], ['fs', 'Döviz satış'], ['bb', 'Efektif alış'], ['bs', 'Efektif satış']];
+var FX_RULE_DEF = {sale:'fb', purchase:'fs', sret:'fb', pret:'fs'};
+function r4(n){ return Math.round((n + Number.EPSILON) * 10000) / 10000; }
+function fm(v, c){ if(!c || c === 'TRY') return money(v); return (v || 0).toLocaleString('tr-TR', {minimumFractionDigits:2, maximumFractionDigits:2}) + ' ' + FX_SYM[c]; }
+function rateFmt(v){ return (v || 0).toLocaleString('tr-TR', {minimumFractionDigits:4, maximumFractionDigits:4}); }
+function fxName(t){ var f = FX_TYPES.filter(function(x){ return x[0] === t; })[0]; return f ? f[1] : (t === 'man' ? 'Elle girilen kur' : String(t || '')); }
+function fxRule(type){ var r = (db.settings && db.settings.fxRules) || {}; return FX_TYPES.some(function(x){ return x[0] === r[type]; }) ? r[type] : (FX_RULE_DEF[type] || 'fb'); }
+function rateRow(cur, date){ var best = null; (db.rates || []).forEach(function(r){ if(r.cur === cur && r.date <= date && (!best || r.date > best.date)) best = r; }); return best; }
+function rateOf(cur, date, type){ var r = rateRow(cur, date), v = r ? Number(r[type]) : 0; return v > 0 ? v : 0; }
+function fxOn(){ return can('fx.use'); }
+/* Merkez Bankası günlük kur dosyası (yerel kullanımda tarayıcıdan denenir; sunucu sürümünde sunucu çeker) */
+function parseTcmb(xml){
+  xml = String(xml || '');
+  var date = null, m = /<Tarih_Date\b[^>]*\bTarih="(\d{2})\.(\d{2})\.(\d{4})"/.exec(xml);
+  if(m) date = m[3] + '-' + m[2] + '-' + m[1];
+  else if((m = /<Tarih_Date\b[^>]*\bDate="(\d{2})\/(\d{2})\/(\d{4})"/.exec(xml))) date = m[3] + '-' + m[1] + '-' + m[2];
+  if(!date) return null;
+  var rates = {}, any = false;
+  FX_CURS.forEach(function(c){
+    var b = new RegExp('<Currency\\b[^>]*\\bCurrencyCode="' + c + '"[^>]*>([\\s\\S]*?)</Currency>').exec(xml); if(!b) return;
+    var tag = function(t){ var x = new RegExp('<' + t + '>([^<]*)</' + t + '>').exec(b[1]); var v = x ? parseFloat(String(x[1]).trim().replace(',', '.')) : NaN; return v > 0 ? v : null; };
+    var r = {fb:tag('ForexBuying'), fs:tag('ForexSelling'), bb:tag('BanknoteBuying'), bs:tag('BanknoteSelling')};
+    if(r.fb || r.fs || r.bb || r.bs){ rates[c] = r; any = true; }
+  });
+  return any ? {date:date, rates:rates} : null;
+}
+function fxMerge(p){                                           // çekilen kurları ekler; elle girilmiş kayıtların üzerine yazmaz
+  var n = 0;
+  Object.keys(p.rates).forEach(function(c){
+    var id = p.date + '|' + c, r = p.rates[c], i = db.rates.findIndex(function(x){ return x.id === id; });
+    var row = {id:id, date:p.date, cur:c, src:'tcmb'}; ['fb', 'fs', 'bb', 'bs'].forEach(function(k){ if(r[k]) row[k] = r[k]; });
+    if(i < 0){ db.rates.push(row); n++; }
+    else if(db.rates[i].src === 'tcmb' && JSON.stringify(db.rates[i]) !== JSON.stringify(row)){ db.rates[i] = row; n++; }
+  });
+  return n;
+}
 var prod = function(id){ return db.products.find(function(p){ return p.id === id; }); };
 var cari = function(id){ return db.caris.find(function(c){ return c.id === id; }); };
 function cariName(id){ if(!id) return 'Perakende'; var c = cari(id); return c ? c.name : '(silinmiş cari)'; }
@@ -797,7 +841,12 @@ function createDoc(o){
     var ol = od.lines.find(function(x){ return x.pid === l.pid; });
     if(ol){ if(ol.vat != null) l.vat = ol.vat; if(T.sellSide && ol.cost != null) l.cost = ol.cost; }
   });
+  if(o.cur){ var raws = (o.lines || []).filter(function(x){ return x.pid && num(x.qty) > 0; }); lines.forEach(function(l, i){ if(raws[i] && raws[i].pf !== undefined && raws[i].pf !== '') l.pf = r2(num(raws[i].pf)); }); }
   var doc = {id:uid(), no:no, type:o.type, date:o.date, cariId:o.cariId || '', lines:lines, total:total, gross:pr.gross, docDisc:pr.docDisc, paid:paid, pays:pays, note:o.note || '', ref:od ? od.id : '', refNo:od ? od.no : '', by:(cur() || {}).id || '', ts:Date.now() + db.seq};
+  if(o.cur){ doc.cur = o.cur; doc.ftotal = o.ftotal; }
+  if(o.fxr) doc.fxr = o.fxr;
+  if(o.tnd) doc.tnd = o.tnd;
+  if(o.chg) doc.chg = o.chg;
   db.docs.push(doc);
   lines.forEach(function(l){
     var mv0 = {id:uid(), pid:l.pid, qty:T.stock * l.qty, date:o.date, reason:KIND[o.type], ref:doc.id, no:no, ts:doc.ts};
@@ -816,7 +865,7 @@ function docRows(docs){
   return '<div class="tbl"><table><thead><tr><th>Tarih</th><th>Tür</th><th>No</th><th>Cari</th><th class="r">Tutar</th><th class="r">Ödenen</th><th class="r">Kalan</th></tr></thead><tbody>' +
     docs.map(function(d){
       var rest = r2(d.total - d.paid);
-      return '<tr data-act="openDoc" data-id="' + d.id + '"><td class="nw">' + fd(d.date) + '</td><td>' + tag(d.type) + '</td><td class="nw">' + esc(d.no) + (d.refNo ? '<div class="muted" style="font-size:12px">↩ ' + esc(d.refNo) + '</div>' : '') + '</td><td>' + esc(cariName(d.cariId)) + '</td><td class="r">' + money(d.total) + '</td><td class="r">' + money(d.paid) + '</td><td class="r">' + (rest > 0.004 ? '<span class="neg">' + money(rest) + '</span>' : '<span class="muted">—</span>') + '</td></tr>';
+      return '<tr data-act="openDoc" data-id="' + d.id + '"><td class="nw">' + fd(d.date) + '</td><td>' + tag(d.type) + '</td><td class="nw">' + esc(d.no) + (d.refNo ? '<div class="muted" style="font-size:12px">↩ ' + esc(d.refNo) + '</div>' : '') + '</td><td>' + esc(cariName(d.cariId)) + '</td><td class="r">' + money(d.total) + (d.cur ? '<div class="muted" style="font-size:12px">' + fm(d.ftotal, d.cur) + '</div>' : '') + '</td><td class="r">' + money(d.paid) + '</td><td class="r">' + (rest > 0.004 ? '<span class="neg">' + money(rest) + '</span>' : '<span class="muted">—</span>') + '</td></tr>';
     }).join('') + '</tbody></table></div>';
 }
 function sortedDocs(types){
@@ -884,7 +933,45 @@ function dsumText(pr){
   return a.join(' · ');
 }
 var PKEY = {n:'Nakit', k:'Kredi kartı', h:'Havale / EFT'};
+function fxEnsure(ed, type){                                   // eksik alanları tamamlar; yetkisiz kullanıcı ve bağlı iade yalnızca TL
+  if(!ed.pc) ed.pc = {n:'TRY', k:'TRY', h:'TRY'};
+  if(!ed.rate) ed.rate = {};
+  if(!ed.rman) ed.rman = {};
+  if(!ed.cur) ed.cur = 'TRY';
+  if(!ed.rt) ed.rt = fxRule(type || 'sale');
+  if(!fxOn() || ed.ref){ ed.cur = 'TRY'; ed.pc = {n:'TRY', k:'TRY', h:'TRY'}; ed.chc = ''; }
+}
+function newEd(type, extra){
+  var ed = Object.assign({cariId:'', date:today(), lines:[{pid:'', qty:1, price:''}], pay:{n:'', k:'', h:''}, pm:'n', note:'', cur:'TRY', rt:fxRule(type), rate:{}, rman:{}, pc:{n:'TRY', k:'TRY', h:'TRY'}, chc:''}, extra || {});
+  fxRefresh(ed); return ed;
+}
+function fxRefresh(ed){                                        // elle yazılmamış kurları tarih ve kur tipine göre tablodan yeniler
+  if(!ed.rate) ed.rate = {}; if(!ed.rman) ed.rman = {};
+  FX_CURS.forEach(function(c){ if(!ed.rman[c]){ var v = rateOf(c, ed.date || today(), ed.rt || 'fb'); ed.rate[c] = v ? String(v) : ''; } });
+}
+function docRate(ed, c){ return (!c || c === 'TRY') ? 1 : num(ed.rate && ed.rate[c]); }
+function fxLines(ed){                                          // dövizli belgede birim fiyatı (döviz) ile TL fiyatı eşler
+  var c = ed.cur || 'TRY'; if(c === 'TRY' || ed.ref) return;
+  var r = docRate(ed, c); if(!(r > 0)) return;
+  ed.lines.forEach(function(l){
+    if(!l.pid) return;
+    if(l.pm){ if(l.pf === undefined || l.pf === '') l.pf = String(r2(num(l.price) / r)); l.price = String(r4(num(l.pf) * r)); }
+    else { var lp = (l.lp !== undefined && l.lp !== '') ? num(l.lp) : num(l.price); l.lp = lp; l.pf = String(r2(lp / r)); l.price = String(r4(num(l.pf) * r)); }
+  });
+}
+function fxSwitchCur(type, ed, nc){
+  var old = ed.cur || 'TRY'; if(nc === old) return;
+  if(old === 'TRY') ed.lines.forEach(function(l){ if(l.pid && !l.pm) l.lp = num(l.price); });
+  ed.lines.forEach(function(l){ if(l.pm) l.pf = ''; });        // elle girilen fiyat TL karşılığı korunarak yeni para birimine çevrilir
+  ed.cur = nc;
+  if(nc === 'TRY'){
+    ed.lines.forEach(function(l){ if(l.pid && !l.pm && l.lp !== undefined) l.price = String(l.lp); l.pf = ''; });
+    if(ed.pc.n === old) ed.pc.n = 'TRY';
+  } else if(ed.pc.n === 'TRY' || ed.pc.n === old) ed.pc.n = nc;
+  fxRefresh(ed); fxLines(ed);
+}
 function syncPay(ed, t){
+  fxEnsure(ed);
   if(ed.pm === 'ref'){
     /* bağlı iade: belgede gerçekten ödenen tutarın, iade edilen paya düşen kısmı, belgedeki ödeme yöntemleriyle */
     var o = ed.ref ? origDoc(ed.ref) : null, km = {'Nakit':'n', 'Kredi kartı':'k', 'Havale / EFT':'h'};
@@ -898,9 +985,87 @@ function syncPay(ed, t){
     }
     return;
   }
-  if(ed.pm){ ['n', 'k', 'h'].forEach(function(k){ ed.pay[k] = (k === ed.pm && t) ? t : ''; }); }
+  if(ed.pm){
+    ['n', 'k', 'h'].forEach(function(k){
+      if(k !== ed.pm || !t){ ed.pay[k] = ''; return; }
+      var c = ed.pc[k] || 'TRY', r = docRate(ed, c);
+      ed.pay[k] = c === 'TRY' ? t : (r > 0 ? r2(t / r) : '');   // dövizle ödemede tutar = fiş tutarı / kur
+    });
+  }
 }
-function edPaid(ed){ return r2(num(ed.pay.n) + num(ed.pay.k) + num(ed.pay.h)); }
+/* Ödeme hesabı: alınan tutarlar (her biri kendi para biriminde), para üstü ve kalan.
+   Kuruş yuvarlaması (döviz cinsinin kuruşu × kur) kadar fark "tam ödenmiş" sayılır. Para üstü yalnızca nakit alınandan verilir. */
+function payCalc(ed, total){
+  fxEnsure(ed);
+  var T = [], tend = 0, cash = 0, tol = 0.004;
+  [['n', 'Nakit'], ['k', 'Kredi kartı'], ['h', 'Havale / EFT']].forEach(function(kv){
+    var a = r2(num(ed.pay[kv[0]])); if(!(a > 0)) return;
+    var c = ed.pc[kv[0]] || 'TRY', r = docRate(ed, c), tl = r2(a * r);
+    T.push({k:kv[0], m:kv[1], c:c, a:a, r:r, tl:tl});
+    tend += tl; if(kv[0] === 'n') cash += tl;
+    if(c !== 'TRY') tol += 0.005 * r;
+  });
+  var cashT = T.filter(function(t){ return t.k === 'n'; })[0];
+  var chc = ed.chc || (cashT ? cashT.c : 'TRY'), cr = docRate(ed, chc);      // para üstü: seçilmediyse alınan nakdin para biriminde
+  if(chc !== 'TRY') tol += 0.005 * cr;
+  var out = {tender:T, tendTL:r2(tend), cashTL:r2(cash), total:total, change:null, paidNet:0, rest:0, err:''};
+  var missing = T.some(function(t){ return t.c !== 'TRY' && !(t.r > 0); });
+  if(missing){ out.err = 'Seçilen para birimi için kur yok'; out.paidNet = 0; out.rest = total; return out; }
+  var diff = r2(tend - total);
+  if(Math.abs(diff) <= tol) out.paidNet = total;
+  else if(diff > 0){
+    if(!(cr > 0)){ out.err = chc + ' kuru yok'; out.paidNet = total; return out; }
+    var ca = r2(diff / cr), ctl = r2(ca * cr), net = r2(tend - ctl);
+    out.change = {c:chc, a:ca, r:cr, tl:ctl};
+    out.paidNet = Math.abs(net - total) <= tol ? total : Math.min(net, total);
+    if(diff > cash + tol) out.err = 'Para üstü yalnızca nakit alınan tutardan verilebilir (kart veya havale tutarı fiş tutarını aşıyor)';
+  } else { out.paidNet = r2(tend); out.rest = r2(total - tend); }
+  return out;
+}
+function edPaid(ed){ return payCalc(ed, edPricing(ed.__type || 'sale', ed).total).paidNet; }
+function amtHTML(ed, tl){                                      // belge para biriminde tutar; dövizliyse altında TL karşılığı
+  var c = ed.cur || 'TRY', r = docRate(ed, c);
+  if(c === 'TRY' || !(r > 0) || ed.ref) return esc(money(tl));
+  return esc(fm(r2(tl / r), c)) + '<div class="muted" style="font-size:12px;font-weight:400">≈ ' + esc(money(tl)) + '</div>';
+}
+function ltText(ed, net){ var c = ed.cur || 'TRY', r = docRate(ed, c); return (c === 'TRY' || !(r > 0) || ed.ref) ? money(net) : fm(r2(net / r), c); }
+function pqText(ed, k){
+  var c = (ed.pc && ed.pc[k]) || 'TRY', a = num(ed.pay[k]); if(c === 'TRY' || !(a > 0)) return '';
+  var r = docRate(ed, c); return r > 0 ? '= ' + money(r2(a * r)) + ' · kur ' + rateFmt(r) : 'Bu para birimi için kur yok';
+}
+function curOpts(sel){ return ['TRY'].concat(FX_CURS).map(function(c){ return '<option value="' + c + '"' + (sel === c ? ' selected' : '') + '>' + (c === 'TRY' ? '₺ TL' : FX_SYM[c] + ' ' + c) + '</option>'; }).join(''); }
+function curField(type, ed){
+  if(!fxOn() || ed.ref) return '';
+  return fld('Belge para birimi', '<select data-ed="' + type + '" data-f="cur">' + ['TRY'].concat(FX_CURS).map(function(c){ return '<option value="' + c + '"' + (ed.cur === c ? ' selected' : '') + '>' + (c === 'TRY' ? '₺ Türk lirası' : FX_SYM[c] + ' ' + c) + '</option>'; }).join('') + '</select>');
+}
+function fxBox(type, ed){
+  if(!fxOn() || ed.ref) return '';
+  var date = ed.date || today(), rr = can('fx.rate'), anyRate = (db.rates || []).length > 0;
+  var used = ed.cur !== 'TRY' || (ed.chc && ed.chc !== 'TRY') || ['n', 'k', 'h'].some(function(k){ return ed.pc[k] !== 'TRY' && num(ed.pay[k]) > 0; });
+  var head = FX_CURS.map(function(c){ return c + ' ' + (docRate(ed, c) ? rateFmt(docRate(ed, c)) : '—'); }).join(' · ');
+  var rows = FX_CURS.map(function(c){
+    var row = rateRow(c, date), man = !!ed.rman[c];
+    var cap = man ? 'Elle girildi' : (row ? fd(row.date) + (row.src === 'elle' ? ' · elle kayıt' : ' · Merkez Bankası') : 'Kur kaydı yok');
+    return fld(c + ' kuru (₺)', '<div class="payrow"><input type="number" inputmode="decimal" step="any" min="0" id="rate_' + c + '" value="' + esc(ed.rate[c]) + '" data-ed="' + type + '" data-f="rate_' + c + '"' + (rr ? '' : ' readonly') + '>' + (rr ? '<button type="button" class="btn sm" data-act="fxAuto" data-type="' + type + '" data-c="' + c + '" title="Tablodaki kura dön">Otomatik</button>' : '') + '</div><div class="muted" id="rc_' + c + '" style="font-size:12px">' + esc(cap) + '</div>');
+  }).join('');
+  return '<details class="fxbox"' + (used || !anyRate ? ' open' : '') + '><summary>Döviz kurları: ' + esc(head) + ' · ' + esc(fxName(ed.rt)) + '</summary>' +
+    '<div class="cols">' + fld('Kur tipi', '<select data-ed="' + type + '" data-f="rt">' + FX_TYPES.map(function(t){ return '<option value="' + t[0] + '"' + (ed.rt === t[0] ? ' selected' : '') + '>' + t[1] + '</option>'; }).join('') + '</select>') + rows + '</div>' +
+    (!anyRate ? '<div class="hint">Henüz kur kaydı yok. ' + (rr ? 'Ayarlar &gt; Döviz ve kurlar bölümünden “Kurları güncelle” deyin ya da kuru buraya elle yazın.' : 'Yöneticinizden kurları güncellemesini isteyin.') + '</div>' : '') + '</details>';
+}
+function chgHTML(type, ed, pc){
+  if(!(pc.tendTL > 0)) return '';
+  var T = TYPES[type], h = '', hasFx = pc.tender.some(function(t){ return t.c !== 'TRY'; });
+  if(hasFx || pc.change) h += '<div class="muted">' + (T.sellSide ? 'Alınan' : 'Verilen') + ' toplam: <b>' + esc(money(pc.tendTL)) + '</b></div>';
+  if(pc.change){
+    h += '<div class="chgline">' + (T.sellSide || type === 'sret' || type === 'pret' ? 'Para üstü' : 'Para üstü (geri alınan)') + ': <b>' + esc(fm(pc.change.a, pc.change.c)) + '</b>' + (pc.change.c !== 'TRY' ? ' <span class="muted">(= ' + esc(money(pc.change.tl)) + ' · kur ' + esc(rateFmt(pc.change.r)) + ')</span>' : '') + '</div>';
+    if(fxOn() && !ed.ref) h += '<div class="chgsel"><span class="muted">Para üstü şu para biriminde:</span> <select data-ed="' + type + '" data-f="chc" aria-label="Para üstü para birimi">' + curOpts(pc.change.c) + '</select></div>';
+  }
+  return h;
+}
+function priceInput(type, ed, i, l, priceOk){
+  if(ed.cur !== 'TRY' && !ed.ref) return '<input class="pc" type="number" inputmode="decimal" step="any" min="0" id="pr' + i + '" placeholder="Fiyat (' + FX_SYM[ed.cur] + ', KDV dahil)" value="' + esc(l.pf) + '"' + (priceOk ? '' : ' readonly') + ' data-ed="' + type + '" data-i="' + i + '" data-f="pf" aria-label="Birim fiyat">';
+  return '<input class="pc" type="number" inputmode="decimal" step="any" min="0" id="pr' + i + '" placeholder="Fiyat (KDV dahil)" value="' + esc(l.price) + '"' + (priceOk ? '' : ' readonly') + ' data-ed="' + type + '" data-i="' + i + '" data-f="price" aria-label="Birim fiyat">';
+}
 function lineInfo(type, ed, i){
   var l = ed.lines[i], p = prod(l.pid);
   if(!p) return '';
@@ -948,7 +1113,8 @@ function discSel(attrs, d){
 function editorHTML(type, ed){
   var T = TYPES[type], ret = type === 'sret' || type === 'pret';
   var cs = db.caris.filter(function(c){ return c.id === ed.cariId || (T.sellSide ? c.type !== 'tedarikci' : c.type !== 'musteri'); }).sort(function(a, b){ return a.name.localeCompare(b.name, 'tr'); });
-  var pr = edPricing(type, ed), tot = pr.total; syncPay(ed, tot); var paid = edPaid(ed);
+  fxEnsure(ed, type); fxLines(ed);
+  var pr = edPricing(type, ed), tot = pr.total; syncPay(ed, tot); var pcalc = payCalc(ed, tot), paid = pcalc.paidNet;
   var pls = priceLines(type, ed.date || today(), ed.lines, ed.cariId);
   var discOk = type !== 'sale' || can('sales.discount'), priceOk = type !== 'sale' || can('sales.price');
   var refUI = '';
@@ -963,14 +1129,17 @@ function editorHTML(type, ed){
   var base = T.sellSide ? 'sale' : 'purchase', retT = T.sellSide ? 'sret' : 'pret';
   var canRet = can(DOC_PERM[base]) && can(DOC_PERM[retT]);
   var sw = canRet ? '<div class="chips">' + [base, retT].map(function(k){ return '<button type="button" class="chip' + (k === type ? ' on' : '') + '" data-act="switchDoc" data-from="' + type + '" data-to="' + k + '">' + KIND[k] + '</button>'; }).join('') + '</div>' : '';
-  var payIn = function(k, label){ return fld(label, '<input type="number" inputmode="decimal" step="any" min="0" id="p_' + k + '" value="' + esc(ed.pay[k]) + '" data-ed="' + type + '" data-f="pay_' + k + '">'); };
+  var payIn = function(k, label){
+    var sel = (fxOn() && !ed.ref) ? '<select class="pcs" data-ed="' + type + '" data-f="pcur_' + k + '" aria-label="Para birimi">' + curOpts(ed.pc[k] || 'TRY') + '</select>' : '';
+    return fld(label, '<div class="payrow"><input type="number" inputmode="decimal" step="any" min="0" id="p_' + k + '" value="' + esc(ed.pay[k]) + '" data-ed="' + type + '" data-f="pay_' + k + '">' + sel + '</div><div class="muted pq" id="pq_' + k + '">' + esc(pqText(ed, k)) + '</div>');
+  };
   return '<div class="bar"><h2>' + ED_TITLE[type] + '</h2><span class="spacer"></span>' + sw + '</div>' + (hint ? '<div class="hint">' + hint + '</div>' : '') + refUI +
   '<div class="card">' +
     '<div class="cols">' +
       fld('Cari', '<div style="display:flex;gap:6px"><select data-ed="' + type + '" data-f="cariId"><option value="">' + (T.sellSide ? 'Perakende (cari yok)' : 'Cari seçin') + '</option>' + cs.map(function(c){ return '<option value="' + c.id + '"' + (ed.cariId === c.id ? ' selected' : '') + '>' + esc(c.name) + '</option>'; }).join('') + '</select>' + (can('addCari') ? '<button type="button" class="btn" data-act="quickCari" data-type="' + type + '" title="Yeni cari">+</button>' : '') + '</div>') +
       fld('Tarih', '<input type="date" value="' + ed.date + '" data-ed="' + type + '" data-f="date">') +
-      priceField(type, ed) +
-    '</div>' +
+      priceField(type, ed) + curField(type, ed) +
+    '</div>' + fxBox(type, ed) +
     '<h3>Ürünler</h3>' +
     '<div class="scanrow"><input id="scan" data-scan="' + type + '" placeholder="Barkod okutun veya kodu yazıp Enter’a basın" autocomplete="off"></div>' +
     '<div class="lines">' +
@@ -979,48 +1148,55 @@ function editorHTML(type, ed){
       return '<div class="line">' +
         '<div><select data-ed="' + type + '" data-i="' + i + '" data-f="pid"><option value="">Ürün seçin</option>' + (ed.ref ? docProducts(ed.ref) : db.products).map(function(p){ return '<option value="' + p.id + '"' + (l.pid === p.id ? ' selected' : '') + '>' + esc(p.name) + (p.barcode ? ' · ' + esc(p.barcode) : (p.code ? ' (' + esc(p.code) + ')' : '')) + '</option>'; }).join('') + '</select>' + variantSel(type, ed, i, l) + '<div class="wn" id="w' + i + '">' + lineInfo(type, ed, i) + '</div></div>' +
         '<input type="number" inputmode="decimal" step="any" min="0" placeholder="Miktar" value="' + esc(l.qty) + '" data-ed="' + type + '" data-i="' + i + '" data-f="qty" aria-label="Miktar">' +
-        '<input class="pc" type="number" inputmode="decimal" step="any" min="0" placeholder="Fiyat (KDV dahil)" value="' + esc(l.price) + '"' + (priceOk ? '' : ' readonly') + ' data-ed="' + type + '" data-i="' + i + '" data-f="price" aria-label="Birim fiyat">' +
-        '<div class="lt" id="lt' + i + '">' + money(pls[i].net) + '</div>' +
+        priceInput(type, ed, i, l, priceOk) +
+        '<div class="lt" id="lt' + i + '">' + ltText(ed, pls[i].net) + '</div>' +
         '<button type="button" class="x" data-act="rmLine" data-type="' + type + '" data-i="' + i + '" aria-label="Satırı sil">×</button>' +
         '<div class="ld">' + (discOk ? '<span class="muted">İskonto</span>' + discSel('data-ed="' + type + '" data-i="' + i + '" data-f="dt"', d) + '<input type="number" inputmode="decimal" step="any" min="0" placeholder="0" value="' + esc(d.v) + '" data-ed="' + type + '" data-i="' + i + '" data-f="dv" aria-label="İskonto değeri">' : '') + '<span id="lc' + i + '">' + campInfo(type, pls[i], i) + '</span></div></div>';
     }).join('') + '</div>' +
     '<div style="margin-top:10px"><button type="button" class="btn sm" data-act="addLine" data-type="' + type + '">+ Satır ekle</button></div>' +
     (discOk ? '<div class="ddisc"><b>Genel iskonto</b>' + discSel('data-ed="' + type + '" data-f="ddt"', dd) + '<input type="number" inputmode="decimal" step="any" min="0" placeholder="0" value="' + esc(dd.v) + '" data-ed="' + type + '" data-f="ddv" aria-label="Genel iskonto değeri"><span class="muted">Satırlardaki indirimlerden sonra toplam tutara uygulanır.</span></div>' : '') +
     '<div class="totals">' +
-      '<div><div class="muted">Toplam</div><div class="big" id="tot">' + money(tot) + '</div></div>' +
-      '<div><div class="muted">Kalan (cari hesaba aktarılır)</div><div class="big" id="rest">' + money(Math.max(0, r2(tot - paid))) + '</div></div>' +
+      '<div><div class="muted">Toplam</div><div class="big" id="tot">' + amtHTML(ed, tot) + '</div></div>' +
+      '<div><div class="muted">Kalan (cari hesaba aktarılır)</div><div class="big" id="rest">' + amtHTML(ed, pcalc.rest) + '</div></div>' +
     '</div>' +
     '<div class="muted" id="dsum" style="margin-top:8px">' + dsumText(pr) + '</div>' +
     '<div class="muted" id="vatl" style="margin-top:4px">' + vatLine(type, ed) + '</div>' +
     '<h3 style="margin-top:16px">' + T.paidLabel + ' tutar (ödeme yöntemine göre)</h3>' +
     '<div class="cols3">' + payIn('n', 'Nakit') + payIn('k', 'Kredi kartı') + payIn('h', 'Havale / EFT') + '</div>' +
     '<div class="chips" style="margin:-4px 0 4px"><button type="button" class="btn sm" data-act="payAll" data-type="' + type + '" data-m="n">Tamamı nakit</button><button type="button" class="btn sm" data-act="payAll" data-type="' + type + '" data-m="k">Tamamı kart</button><button type="button" class="btn sm" data-act="payAll" data-type="' + type + '" data-m="h">Tamamı havale</button><button type="button" class="btn sm" data-act="credit" data-type="' + type + '">' + (ret ? 'Para iadesi yok' : 'Cari hesaba aktar') + '</button></div>' +
-    '<div class="wn" id="payw"></div>' +
+    '<div id="chgbox">' + chgHTML(type, ed, pcalc) + '</div>' +
+    '<div class="wn" id="payw">' + (pcalc.err ? '<span class="neg">' + esc(pcalc.err) + '</span>' : '') + '</div>' +
     '<div style="margin-top:12px">' + fld('Not', '<input type="text" value="' + esc(ed.note) + '" data-ed="' + type + '" data-f="note" placeholder="İsteğe bağlı">') + '</div>' +
     '<div class="row-end"><button class="btn" data-act="cancelDoc" data-type="' + type + '">Vazgeç</button><button class="btn pri" data-act="saveDoc" data-type="' + type + '">' + ED_SAVE[type] + '</button></div>' +
   '</div>';
 }
 function updateTotals(type){
   var ed = state.ed[type]; if(!ed || !$('#tot')) return;
+  fxEnsure(ed, type); fxLines(ed);
   var pr = edPricing(type, ed), t = pr.total;
   var pls = priceLines(type, ed.date || today(), ed.lines, ed.cariId);
   if(ed.pm){
     syncPay(ed, t);
     ['n', 'k', 'h'].forEach(function(k){ var i = $('#p_' + k); if(i) i.value = ed.pay[k]; });
   }
-  var paid = edPaid(ed);
-  $('#tot').textContent = money(t);
-  $('#rest').textContent = money(Math.max(0, r2(t - paid)));
-  var pw = $('#payw'); if(pw) pw.innerHTML = paid > t + 0.004 ? '<span class="neg">Ödeme toplamı fiş tutarını aşıyor</span>' : '';
+  var pc = payCalc(ed, t);
+  $('#tot').innerHTML = amtHTML(ed, t);
+  $('#rest').innerHTML = amtHTML(ed, pc.rest);
+  var pw = $('#payw'); if(pw) pw.innerHTML = pc.err ? '<span class="neg">' + esc(pc.err) + '</span>' : '';
+  var cb = $('#chgbox'); if(cb) cb.innerHTML = chgHTML(type, ed, pc);
+  ['n', 'k', 'h'].forEach(function(k){ var q = $('#pq_' + k); if(q) q.textContent = pqText(ed, k); });
   var ds = $('#dsum'); if(ds) ds.textContent = dsumText(pr);
   var vl = $('#vatl'); if(vl) vl.textContent = vatLine(type, ed);
+  var fx = ed.cur !== 'TRY' && !ed.ref;
   ed.lines.forEach(function(l, i){
     var pl = pls[i];
     var a = $('#lt' + i), w = $('#w' + i), c = $('#lc' + i);
-    if(a) a.textContent = money(pl.net);
+    if(a) a.textContent = ltText(ed, pl.net);
+    if(fx && !l.pm){ var pi = $('#pr' + i); if(pi && document.activeElement !== pi) pi.value = l.pf; }
     if(w) w.innerHTML = lineInfo(type, ed, i);
     if(c) c.innerHTML = campInfo(type, pl, i);
   });
+  FX_CURS.forEach(function(c){ var ri = $('#rate_' + c); if(ri && !ed.rman[c] && document.activeElement !== ri) ri.value = ed.rate[c]; });
 }
 function newDq(){ return {sale:{q:'', from:'', to:'', t:''}, purchase:{q:'', from:'', to:'', t:''}}; }
 function docMatch(d, f){
@@ -1642,6 +1818,7 @@ V.settings = function(){
     fld('Vergi dairesi / no', '<input id="s_tax" value="' + esc(db.settings.taxNo) + '">') +
     '</div>' +
     '<button class="btn pri" data-act="saveName">Kaydet</button></div>' + logoCard() + rcCard() + lblCard() + eanCard() + menusCard() : '') +
+  ((ed || can('fx.use') || can('fx.rate')) ? fxCard() : '') +
   (adm ? usersCard() : '') +
   (adm ? '<div class="card"><h3>Yedekleme</h3><p class="muted" style="margin-top:0">' + (SRV ? 'Veriler sunucudaki SQL Server veritabanında saklanır. Buradan indirilen dosya, ekrandaki verilerin bir kopyasıdır (şifreler dahil değildir). Veritabanı yedeği için sunucudaki yedek betiğini kullanın.' : 'Veriler bu tarayıcıda saklanır. Tarayıcı verisini temizlerseniz silinir; bu yüzden düzenli olarak yedek alın. Yedek kullanıcıları ve şifre özetlerini de içerir, güvenli bir yerde saklayın.') + '</p>' +
     '<div class="row-end" style="justify-content:flex-start;margin-bottom:10px"><button class="btn" data-act="downloadBackup">Yedek dosyası indir</button><button class="btn" data-act="exportData">Yedek metni oluştur</button>' + (SRV ? '' : '<label class="btn" style="cursor:pointer;margin:0">Dosyadan geri yükle<input type="file" id="bkfile" accept=".json,application/json,text/plain" style="display:none"></label><button class="btn" data-act="importData">Kutudaki metinden geri yükle</button>') + '</div>' +
@@ -1672,8 +1849,8 @@ function reprice(type, ed){                                   // elle fiyat giri
   ed.lines.forEach(function(l){
     if(!l.pid || l.pm) return;
     var p = prod(l.pid); if(!p) return;
-    var np = unitPrice(p, ed.cariId, ed.pk);
-    if(num(l.price) !== np){ l.price = np; n++; }
+    var np = unitPrice(p, ed.cariId, ed.pk), fxd = ed.cur && ed.cur !== 'TRY';
+    if(num(fxd ? l.lp : l.price) !== np){ if(fxd) l.lp = np; else l.price = np; n++; }
   });
   return n;
 }
@@ -1689,7 +1866,7 @@ function priceField(type, ed){
 A.newDoc = function(d){
   if(DOC_PERM[d.type] && !can(DOC_PERM[d.type])){ toast('Bu işlem için yetkiniz yok', 'err'); return; }
   if(!db.products.length){ toast('Önce bir ürün kartı açın', 'err'); state.tab = 'products'; render(); return; }
-  state.ed[d.type] = {cariId:'', date:today(), lines:[{pid:'', qty:1, price:''}], pay:{n:'', k:'', h:''}, pm:'n', note:''};
+  state.ed[d.type] = newEd(d.type);
   render();
 };
 A.cancelDoc = function(d){ state.ed[d.type] = null; render(); };
@@ -1716,6 +1893,45 @@ A.catQuick = function(d){                                         // ürün kart
   var box = $('#vp_' + kind); if(box) box.outerHTML = varPick(kind, cur);
   commit(); vgRefresh(); toast('Eklendi ve seçildi');
 };
+A.fxAuto = function(d){ var ed = state.ed[d.type]; if(!ed) return; ed.rman[d.c] = false; fxRefresh(ed); fxLines(ed); render(); };
+A.fxUpdate = async function(){
+  if(SRV){
+    try{ var r = await api('POST', '/api/kurlar/guncelle'); try{ await pollOnce(); }catch(e){} toast(r.latest ? 'Kurlar güncellendi. Son kur: ' + fd(r.latest) : 'Kur bulunamadı', r.latest ? '' : 'err'); render(); }
+    catch(e){ toast(e.message || 'Kurlar güncellenemedi', 'err'); }
+    return;
+  }
+  try{
+    var res = await fetch('https://www.tcmb.gov.tr/kurlar/today.xml', {cache:'no-store'});
+    if(!res.ok) throw new Error('HTTP ' + res.status);
+    var p = parseTcmb(await res.text()); if(!p) throw new Error('beklenmeyen biçim');
+    var n = fxMerge(p); commit(); toast(n ? 'Kurlar güncellendi. Son kur: ' + fd(p.date) : 'Kurlar zaten güncel. Son kur: ' + fd(p.date));
+  }catch(e){ toast('Kurlar tarayıcıdan çekilemedi (Merkez Bankası bu sayfaya erişim izni vermiyor olabilir). “Elle kur ekle” ile kuru girin ya da sunucu sürümünü kullanın.', 'err'); }
+};
+A.fxAdd = function(){
+  modal('Elle kur ekle',
+    '<div class="hint">Girdiğiniz kur, o tarih ve para birimi için kayıtlı kurun yerine geçer. Boş bıraktığınız kur tipleri kullanılamaz.</div>' +
+    '<div class="cols">' + fld('Tarih', '<input type="date" name="date" value="' + today() + '" required>') + fld('Para birimi', '<select name="cur">' + FX_CURS.map(function(c){ return '<option value="' + c + '">' + FX_SYM[c] + ' ' + c + '</option>'; }).join('') + '</select>') + '</div>' +
+    '<div class="cols">' + FX_TYPES.map(function(t){ return fld(t[1], '<input type="number" inputmode="decimal" step="any" min="0" name="v_' + t[0] + '">'); }).join('') + '</div>',
+    function(f){
+      if(!/^\d{4}-\d{2}-\d{2}$/.test(f.date || '')){ toast('Tarih seçin', 'err'); return false; }
+      var row = {id:f.date + '|' + f.cur, date:f.date, cur:f.cur, src:'elle'}, n = 0;
+      FX_TYPES.forEach(function(t){ var v = num(f['v_' + t[0]]); if(v > 0){ row[t[0]] = r4(v); n++; } });
+      if(!n){ toast('En az bir kur girin', 'err'); return false; }
+      var i = db.rates.findIndex(function(x){ return x.id === row.id; });
+      if(i >= 0) db.rates[i] = row; else db.rates.push(row);
+      commit(); toast('Kur kaydedildi');
+    }, 'Kaydet');
+};
+A.fxDel = function(d){
+  var r = db.rates.find(function(x){ return x.id === d.id; }); if(!r) return;
+  if(r.src !== 'elle'){ toast('Merkez Bankası kurları silinemez', 'err'); return; }
+  confirmBox(fd(r.date) + ' ' + r.cur + ' elle girilen kuru silinsin mi?', function(){ db.rates = db.rates.filter(function(x){ return x.id !== d.id; }); commit(); toast('Silindi'); });
+};
+A.fxRules = function(){
+  var o = {}; document.querySelectorAll('[data-fxr]').forEach(function(sel){ o[sel.dataset.fxr] = sel.value; });
+  db.settings.fxRules = o; commit(); toast('Kur tipleri kaydedildi');
+};
+A.fxRulesReset = function(){ delete db.settings.fxRules; commit(); toast('Varsayılan kur tiplerine dönüldü'); };
 A.vbAuto = function(){
   var f = $('#mf'); if(!f) return;
   var typed = [], mb = f.elements.barcode ? f.elements.barcode.value.trim() : ''; if(mb) typed.push(mb);
@@ -1790,14 +2006,35 @@ A.saveDoc = async function(d){
     else { if(!vb.c.length) l.cl = ''; if(!vb.s.length) l.sz = ''; }
   });
   if(vbad){ toast(vbad, 'err'); return; }
+  fxEnsure(ed, type); fxLines(ed);
   var pr = edPricing(type, ed);
   syncPay(ed, pr.total);
   if(!pr.lines.length){ toast('En az bir ürün ve miktar girin', 'err'); return; }
-  var total = pr.total;
-  var pays = {};
-  ['n', 'k', 'h'].forEach(function(k){ var v = r2(num(ed.pay[k])); if(v > 0) pays[PKEY[k]] = v; });
-  var paid = r2(sum(Object.keys(pays), function(m){ return pays[m]; }));
-  if(paid > total + 0.004){ toast('Ödeme toplamı fiş tutarını aşıyor', 'err'); return; }
+  var total = pr.total, pc = payCalc(ed, total);
+  if(pc.err){ toast(pc.err, 'err'); return; }
+  var need = {};
+  if(ed.cur !== 'TRY') need[ed.cur] = 1;
+  pc.tender.forEach(function(x){ if(x.c !== 'TRY') need[x.c] = 1; });
+  if(pc.change && pc.change.c !== 'TRY') need[pc.change.c] = 1;
+  if(Object.keys(need).length && !fxOn()){ toast('Dövizli işlem yapma yetkiniz yok', 'err'); return; }
+  var miss = Object.keys(need).find(function(c){ return !(docRate(ed, c) > 0); });
+  if(miss){ toast(miss + ' kuru yok. ' + (can('fx.rate') ? 'Kuru elle yazın ya da Ayarlar > Döviz ve kurlar bölümünden kurları güncelleyin.' : 'Yöneticinizden kurları güncellemesini isteyin.'), 'err'); return; }
+  var paid = pc.paidNet, pays = {};
+  pc.tender.forEach(function(x){ pays[x.m] = r2((pays[x.m] || 0) + x.tl); });
+  if(pc.change) pays['Nakit'] = r2((pays['Nakit'] || 0) - pc.change.tl);
+  var padj = r2(paid - sum(Object.keys(pays), function(m){ return pays[m]; }));      // kuruş yuvarlaması: nakit tutarı ödenene eşitlenir
+  if(padj){ var pmk = pays['Nakit'] !== undefined ? 'Nakit' : Object.keys(pays)[0]; if(pmk) pays[pmk] = r2((pays[pmk] || 0) + padj); }
+  Object.keys(pays).forEach(function(m){ if(!(pays[m] > 0)) delete pays[m]; });
+  var fx = {};
+  if(Object.keys(need).length){
+    var fxr = {}; Object.keys(need).forEach(function(c){ var row = rateRow(c, ed.date || today()); fxr[c] = {r:docRate(ed, c), t:ed.rman[c] ? 'man' : ed.rt, d:ed.rman[c] ? (ed.date || today()) : (row ? row.date : (ed.date || today()))}; });
+    fx.fxr = fxr;
+  }
+  if(ed.cur !== 'TRY'){ fx.cur = ed.cur; fx.ftotal = r2(total / docRate(ed, ed.cur)); }
+  if(pc.tender.some(function(x){ return x.c !== 'TRY'; }) || pc.change){
+    fx.tnd = pc.tender.map(function(x){ return {m:x.m, c:x.c, a:x.a, tl:x.tl}; });
+    if(pc.change) fx.chg = {c:pc.change.c, a:pc.change.a, tl:pc.change.tl};
+  }
   if(!ed.cariId && paid < total - 0.004){ toast('Cari seçmeden kalan tutar bırakılamaz. Cari seçin ya da tamamını ödeme olarak girin.', 'err'); return; }
   if(ed.ref && (type === 'sret' || type === 'pret')){
     var byp = {};
@@ -1807,7 +2044,7 @@ A.saveDoc = async function(d){
   }
   var rno = null;
   if(SRV){ try{ rno = (await api('POST', '/api/reserve', {type:type})).no; }catch(e){ if(e.status === 401) srvLogout('Oturum süresi doldu, yeniden giriş yapın'); else toast(e.message || 'Belge numarası alınamadı, bağlantıyı kontrol edin', 'err'); return; } }
-  var nd = createDoc({type:type, no:rno, date:ed.date || today(), cariId:ed.cariId, lines:ed.lines, docDisc:ed.docDisc, pays:pays, note:ed.note, ref:ed.ref});
+  var nd = createDoc({type:type, no:rno, date:ed.date || today(), cariId:ed.cariId, lines:ed.lines, docDisc:ed.docDisc, pays:pays, note:ed.note, ref:ed.ref, cur:fx.cur, ftotal:fx.ftotal, fxr:fx.fxr, tnd:fx.tnd, chg:fx.chg});
   state.ed[type] = null; commit(); toast(KIND[type] + ' kaydedildi');
   if(type === 'sale' || type === 'sret') A.receipt({kind:'doc', id:nd.id});
 };
@@ -1822,7 +2059,7 @@ A.openDoc = function(d){
   var retT = x.type === 'sale' ? 'sret' : x.type === 'purchase' ? 'pret' : '';
   var refBtn = (retT && can(DOC_PERM[retT]) && docHasRemaining(x)) ? '<button type="button" class="btn" data-act="refundDoc" data-id="' + x.id + '">' + (retT === 'sret' ? 'İade al' : 'İade yap') + '</button>' : '';
   modal(KIND[x.type] + ' ' + x.no,
-    '<div class="hint">' + fd(x.date) + ' · ' + esc(cariName(x.cariId)) + (x.note ? ' · ' + esc(x.note) : '') + (x.by ? ' · ' + esc(userName(x.by)) : '') + (x.refNo ? ' · Bağlı belge: ' + esc(x.refNo) : '') + '</div>' +
+    '<div class="hint">' + fd(x.date) + ' · ' + esc(cariName(x.cariId)) + (x.note ? ' · ' + esc(x.note) : '') + (x.by ? ' · ' + esc(userName(x.by)) : '') + (x.refNo ? ' · Bağlı belge: ' + esc(x.refNo) : '') + '</div>' + fxDocInfo(x) +
     '<div class="tbl"><table><thead><tr><th>Ürün</th><th class="r">Miktar</th><th class="r">Fiyat</th><th class="r">İndirim</th><th class="r">Tutar</th></tr></thead><tbody>' + x.lines.map(function(l){
       var p = prod(l.pid), ld = r2(lg(l) - lt(l));
       return '<tr><td>' + esc(p ? p.name : '(silinmiş)') + (l.cl || l.sz ? '<div class="muted" style="font-size:12px">' + esc(varLabel(l.cl, l.sz)) + '</div>' : '') + '</td><td class="r">' + qf(l.qty) + ' ' + esc(p ? p.unit : '') + '</td><td class="r">' + money(l.price) + '</td><td class="r">' + (ld > 0.004 ? '−' + money(ld) + (l.camp ? '<div class="muted">' + esc(l.camp) + '</div>' : '') : '') + '</td><td class="r">' + money(lt(l)) + '</td></tr>';
@@ -1998,11 +2235,19 @@ function onEd(e){
     else {
       l[f] = t.value;
       if(f === 'price') l.pm = true;                                // elle girilen fiyat, cari/tür değişince korunur
+      if(f === 'pf'){ l.pm = true; l.price = String(r4(num(t.value) * docRate(ed, ed.cur))); }          // dövizli belge: döviz fiyatı → TL
       if(f === 'cl' || f === 'sz'){ render(); return; }
-      if(f === 'pid'){ l.cl = ''; l.sz = ''; var p = prod(t.value); if(p){ l.price = lineDefault(type, ed, p); l.pm = false; } l.noCamp = false; render(); return; }
+      if(f === 'pid'){ l.cl = ''; l.sz = ''; var p = prod(t.value); if(p){ l.price = lineDefault(type, ed, p); l.pm = false; l.lp = l.price; l.pf = ''; } l.noCamp = false; render(); return; }
     }
   } else if(f.indexOf('pay_') === 0){
     ed.pay[f.slice(4)] = t.value; ed.pm = null;
+  } else if(f === 'cur'){ fxSwitchCur(type, ed, t.value); render(); return;
+  } else if(f === 'rt'){ ed.rt = t.value; fxRefresh(ed); fxLines(ed); render(); return;
+  } else if(f.indexOf('rate_') === 0){
+    var rc0 = f.slice(5); ed.rate[rc0] = t.value; ed.rman[rc0] = true; fxLines(ed);
+    var rcap = $('#rc_' + rc0); if(rcap) rcap.textContent = 'Elle girildi';
+  } else if(f.indexOf('pcur_') === 0){ ed.pc[f.slice(5)] = t.value; render(); return;
+  } else if(f === 'chc'){ ed.chc = t.value;
   } else if(f === 'refq'){
     var nr = t.value.split(' · ')[0].trim().toLowerCase(), bt = type === 'sret' ? 'sale' : 'purchase';
     var rd0 = db.docs.find(function(x){ return x.type === bt && x.no.toLowerCase() === nr; });
@@ -2016,6 +2261,7 @@ function onEd(e){
   } else {
     ed[f] = t.value;
     if(f === 'cariId' || f === 'pk'){ var rn = reprice(type, ed); if(rn) toast(rn + ' satırın fiyatı güncellendi'); render(); return; }
+    if(f === 'date'){ var before = JSON.stringify(ed.rate); fxRefresh(ed); if(before !== JSON.stringify(ed.rate)){ fxLines(ed); render(); return; } }
     if(f === 'note') return;
   }
   updateTotals(type);
@@ -2834,7 +3080,7 @@ A.refundDoc = function(d){
   if(!docHasRemaining(x)){ toast('Bu belgenin tamamı zaten iade edilmiş', 'err'); return; }
   closeModal();
   state.tab = x.type === 'sale' ? 'sales' : 'purchases';
-  state.ed[type] = {cariId:'', date:today(), lines:[{pid:'', qty:1, price:''}], pay:{n:'', k:'', h:''}, pm:'n', note:'', ref:x.id};
+  state.ed[type] = newEd(type, {ref:x.id});
   applyRef(type, state.ed[type]);
   render(); window.scrollTo(0, 0);
 };
@@ -2870,6 +3116,25 @@ A.saveEan = function(){
   db.settings.eanPrefix = v; commit(); toast('Barkod başlangıcı kaydedildi: ' + v);
 };
 A.eanReset = function(){ delete db.settings.eanPrefix; commit(); toast('Varsayılan başlangıca (29) dönüldü'); };
+function fxCard(){
+  var se = can('settings.edit'), rr = can('fx.rate');
+  var rules = [['sale', 'Satış'], ['sret', 'Satış iadesi'], ['purchase', 'Alış'], ['pret', 'Alış iadesi']];
+  var rrows = rules.map(function(r){ return '<tr><td>' + r[1] + '</td><td><select data-fxr="' + r[0] + '"' + (se ? '' : ' disabled') + '>' + FX_TYPES.map(function(t){ return '<option value="' + t[0] + '"' + (fxRule(r[0]) === t[0] ? ' selected' : '') + '>' + t[1] + '</option>'; }).join('') + '</select></td></tr>'; }).join('');
+  var dates = []; (db.rates || []).forEach(function(r){ if(dates.indexOf(r.date) < 0) dates.push(r.date); });
+  dates.sort().reverse(); dates = dates.slice(0, 7);
+  var rs = (db.rates || []).filter(function(r){ return dates.indexOf(r.date) >= 0; }).sort(function(a, b){ return b.date.localeCompare(a.date) || a.cur.localeCompare(b.cur); });
+  var v = function(x){ return x ? rateFmt(x) : '<span class="muted">—</span>'; };
+  var tbl = rs.length ? '<div class="tbl"><table><thead><tr><th>Tarih</th><th>Birim</th><th class="r">Döviz alış</th><th class="r">Döviz satış</th><th class="r">Efektif alış</th><th class="r">Efektif satış</th><th>Kaynak</th><th></th></tr></thead><tbody>' + rs.map(function(r){
+    return '<tr><td>' + fd(r.date) + '</td><td><b>' + esc(r.cur) + '</b></td><td class="r">' + v(r.fb) + '</td><td class="r">' + v(r.fs) + '</td><td class="r">' + v(r.bb) + '</td><td class="r">' + v(r.bs) + '</td><td class="muted">' + (r.src === 'elle' ? 'Elle' : 'Merkez Bankası') + '</td><td class="r">' + (rr && r.src === 'elle' ? '<button class="btn sm danger" data-act="fxDel" data-id="' + esc(r.id) + '">Sil</button>' : '') + '</td></tr>';
+  }).join('') + '</tbody></table></div>' : '<div class="muted">Henüz kur kaydı yok.</div>';
+  return '<div class="card"><h3>Döviz ve kurlar</h3>' +
+    '<p class="muted" style="margin-top:0">USD ve EUR kurları Merkez Bankası’ndan çekilir; iş günlerinde saat 15:30’dan sonra yayınlanır, hafta sonu ve tatilde son yayınlanan kur kullanılır.' + (SRV ? ' Sunucu kurları kendiliğinden günceller ve tüm cihazlarda ortaktır.' : ' Bu tarayıcı sürümünde Merkez Bankası erişime izin vermezse kuru elle ekleyin; sunucu sürümü kurları kendiliğinden çeker.') + ' Hangi işlemde hangi kur tipinin kullanılacağını aşağıdan seçin; belgede de değiştirebilir veya kuru elle yazabilirsiniz.</p>' +
+    '<div class="muted" style="font-size:13px;margin-bottom:8px">' + (dates.length ? 'Son kur: <b>' + fd(dates[0]) + '</b>' : 'Henüz kur kaydı yok.') + '</div>' +
+    ((rr) ? '<div class="chips" style="margin-bottom:8px"><button class="btn pri sm" data-act="fxUpdate">Kurları güncelle</button><button class="btn sm" data-act="fxAdd">Elle kur ekle</button></div>' : '') + tbl +
+    '<h4 style="margin:14px 0 6px">Hangi işlemde hangi kur tipi</h4><div class="tbl" style="max-width:420px"><table><thead><tr><th>İşlem</th><th>Kur tipi</th></tr></thead><tbody>' + rrows + '</tbody></table></div>' +
+    '<div class="muted" style="font-size:12px;margin:6px 0">Varsayılan: satışta döviz alış, alışta döviz satış. Bu tercih yeni belgelerde başlangıç değeridir; her belgede ayrıca değiştirilebilir. Hangi kurun hangi işlemde kullanılacağını (özellikle fatura ve KDV için) muhasebecinizle teyit edin.</div>' +
+    (se ? '<div class="chips"><button class="btn" data-act="fxRules">Kaydet</button><button class="btn" data-act="fxRulesReset">Varsayılana dön</button></div>' : '') + '</div>';
+}
 function menusCard(){
   var m = (db.settings && db.settings.menus) || {};
   return '<div class="card"><h3>Menü adları</h3><p class="muted" style="margin-top:0">Soldaki menüde görünen adları değiştirebilirsiniz. Boş bırakılan ad varsayılan adına döner.</p><div class="cols3">' +
@@ -3235,7 +3500,7 @@ A.switchDoc = function(d){
   if(d.from === d.to) return;
   if(DOC_PERM[d.to] && !can(DOC_PERM[d.to])){ toast('Bu işlem için yetkiniz yok', 'err'); return; }
   var ed = state.ed[d.from]; if(!ed) return;
-  ed.ref = ''; if(ed.pm === 'ref') ed.pm = 'n'; state.ed[d.from] = null; state.ed[d.to] = ed; render();
+  ed.ref = ''; if(ed.pm === 'ref') ed.pm = 'n'; ed.rt = fxRule(d.to); fxRefresh(ed); state.ed[d.from] = null; state.ed[d.to] = ed; render();
 };
 A.repMethod = function(d){ state.rep.method = d.m; render(); };
 A.copyPay = function(){
@@ -3271,6 +3536,26 @@ function rcptFoot(kind){
   if(rc.notice) parts += '<div class="c" style="margin-top:6px;font-size:11px">Bilgi fişidir, mali değeri yoktur.</div>';
   return (parts ? '<hr>' + parts : '') + '</div>';
 }
+function fxDocInfo(x){                                         // belge penceresi: para birimi, kur, alınan tutar ve para üstü
+  var h = [], sellSide = TYPES[x.type].sellSide;
+  if(x.cur && x.fxr && x.fxr[x.cur]){ var e = x.fxr[x.cur]; h.push('Para birimi <b>' + esc(x.cur) + '</b> · kur ' + rateFmt(e.r) + ' (' + esc(fxName(e.t)) + (e.d ? ', ' + fd(e.d) : '') + ') · Döviz toplamı <b>' + esc(fm(x.ftotal, x.cur)) + '</b>'); }
+  if(x.tnd && x.tnd.length) h.push((sellSide ? 'Alınan' : 'Verilen') + ': ' + x.tnd.map(function(t){ return esc(t.m) + ' ' + esc(fm(t.a, t.c)) + (t.c !== 'TRY' ? ' (= ' + esc(money(t.tl)) + ')' : ''); }).join(' · '));
+  if(x.chg) h.push('Para üstü: <b>' + esc(fm(x.chg.a, x.chg.c)) + '</b>' + (x.chg.c !== 'TRY' ? ' (= ' + esc(money(x.chg.tl)) + ')' : ''));
+  return h.length ? '<div class="muted" style="font-size:13px;margin-bottom:8px">' + h.join('<br>') + '</div>' : '';
+}
+function rcptFx(x, part){                                      // fiş: döviz toplamı (TOPLAM'ın altında), alınan tutarlar ve para üstü (ödemelerin altında)
+  var h = '', sell = TYPES[x.type].sellSide;
+  if(part === 'total'){
+    if(x.cur && x.fxr && x.fxr[x.cur]) h += '<div class="rr"><span>Para birimi / kur</span><span>' + esc(x.cur) + ' · ' + esc(rateFmt(x.fxr[x.cur].r)) + '</span></div><div class="rr b"><span>Döviz toplamı</span><span>' + esc(fm(x.ftotal, x.cur)) + '</span></div>';
+    return h;
+  }
+  (x.tnd || []).forEach(function(t){
+    h += '<div class="rr"><span>&nbsp;&nbsp;' + (sell ? 'Alınan ' : 'Verilen ') + esc(t.m) + '</span><span>' + esc(fm(t.a, t.c)) + '</span></div>';
+    if(t.c !== 'TRY' && x.fxr && x.fxr[t.c]) h += '<div class="rr"><span>&nbsp;&nbsp;&nbsp;&nbsp;kur ' + esc(rateFmt(x.fxr[t.c].r)) + '</span><span>' + esc(money(t.tl)) + '</span></div>';
+  });
+  if(x.chg) h += '<div class="rr"><span>&nbsp;&nbsp;Para üstü</span><span>' + esc(fm(x.chg.a, x.chg.c)) + '</span></div>' + (x.chg.c !== 'TRY' ? '<div class="rr"><span>&nbsp;&nbsp;&nbsp;&nbsp;(TL karşılığı)</span><span>' + esc(money(x.chg.tl)) + '</span></div>' : '');
+  return h;
+}
 function rcptDoc(x){
   var vs = vatSplit(x.lines), rest = r2(x.total - x.paid), T = TYPES[x.type], pp = docPays(x), rc = rcOpt();
   var h = rcptHead(rc.titles[x.type], x.no, x.date);
@@ -3300,8 +3585,10 @@ function rcptDoc(x){
     Object.keys(vs.by).sort(function(a, b){ return a - b; }).forEach(function(r){ h += '<div class="rr"><span>KDV %' + r + '</span><span>' + money(vs.by[r].vat) + '</span></div>'; });
   }
   h += '<div class="rr b"><span>TOPLAM</span><span>' + money(x.total) + '</span></div>';
+  if(rc.pays) h += rcptFx(x, 'total');
   h += '<div class="rr"><span>' + T.paidLabel + '</span><span>' + money(x.paid) + '</span></div>';
   if(rc.pays) Object.keys(pp).forEach(function(m){ h += '<div class="rr"><span>&nbsp;&nbsp;' + esc(m) + '</span><span>' + money(pp[m]) + '</span></div>'; });
+  if(rc.pays) h += rcptFx(x, 'pay');
   if(rest > 0.004) h += '<div class="rr"><span>' + 'Kalan (cari hesaba aktarıldı)' + '</span><span>' + money(rest) + '</span></div>';
   if(rc.disc && disc > 0.004 && x.type === 'sale') h += '<div class="c" style="margin-top:4px">Bu alışverişte ' + money(disc) + ' indirim kazandınız.</div>';
   if(x.note) h += '<div>' + esc(x.note) + '</div>';
@@ -3566,7 +3853,7 @@ async function doSetup(f){
 /* ---------- Sunucu modu (SQL Server veritabanı) ---------- */
 var SRV = false, SRVSETUP = false;
 var sync = {since:0, snap:null, busy:false, again:false, timer:null, state:'ok', pending:0, retry:0, renderPending:false};
-var COLLS = ['products', 'caris', 'docs', 'payments', 'moves', 'campaigns'];
+var COLLS = ['products', 'caris', 'docs', 'payments', 'moves', 'campaigns', 'rates'];
 
 function api(method, url, body){
   return fetch(url, {method:method, headers:body ? {'Content-Type':'application/json'} : {}, body:body ? JSON.stringify(body) : undefined, credentials:'same-origin', cache:'no-store'})
@@ -3651,7 +3938,7 @@ async function syncFailed(e){
 async function loadSnapshot(userId){
   var r = await api('GET', '/api/sync?since=0');
   var d = r.data, base = defaults();
-  db = Object.assign(base, {products:d.products, caris:d.caris, docs:d.docs, payments:d.payments, moves:d.moves, campaigns:d.campaigns, settings:d.settings || {}, users:r.users});
+  db = Object.assign(base, {products:d.products, caris:d.caris, docs:d.docs, payments:d.payments, moves:d.moves, campaigns:d.campaigns, rates:d.rates || [], settings:d.settings || {}, users:r.users});
   if(userId) sessId = userId;
   ensureAttrVals();                                          // yerel düzenleme; sunucuya fark olarak gönderilmez
   sync.snap = snapRows(); sync.since = r.ver; sync.pending = 0; sync.retry = 0; setSyncState('ok');
