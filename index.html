@@ -116,6 +116,7 @@ label.f>input,label.f>select,label.f>textarea{margin-top:4px;font-weight:400}
 .chip.on{background:var(--accent-soft);color:var(--accent);border-color:var(--accent)}
 .lines{display:grid;gap:8px}
 .line{display:grid;gap:8px;grid-template-columns:1fr 90px 110px 110px 34px;align-items:start;padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--surface-2)}
+.line.stk{grid-template-columns:1fr 110px 34px}
 .line .lt{text-align:right;font-weight:600;padding-top:9px}
 .line .wn{font-size:12px;margin-top:3px}
 .line .x{border:0;background:none;color:var(--muted);font-size:20px;cursor:pointer;line-height:1;padding:6px}
@@ -230,7 +231,7 @@ label.f>input,label.f>select,label.f>textarea{margin-top:4px;font-weight:400}
 <script>
 /* ---------- Veri ---------- */
 var KEY = 'stokcari_v1';
-var APP_VERSION = '2026.10.25-4';
+var APP_VERSION = '2026.10.25-6';
 function defaults(){ return {products:[],caris:[],docs:[],payments:[],moves:[],counters:{sale:0,purchase:0},seq:1,users:[],campaigns:[],settings:{name:'',phone:'',address:'',taxNo:'',footer:'',logo:'',logoRcpt:false,attrVals:[[],[],[],[],[]]}}; }
 function load(){
   try{ var s = localStorage.getItem(KEY); if(s){ var o = JSON.parse(s); return Object.assign(defaults(), o); } }catch(e){}
@@ -302,7 +303,7 @@ var ACT_PERM = {
   newProduct:'products.edit', editProduct:'products.edit', genEan:'products.edit', delProduct:'products.delete',
   label:'products.labels', batchLabels:'products.labels', autoBarcodes:'products.labels', lblAll:'products.labels', lblStock:'products.labels', bulkBarcode:'products.labels', bbAll:'products.labels', bbLabels:'products.labels',
   impExcel:'products.import', impTemplate:'products.import',
-  stockMove:'stock.move', delMove:'stock.delete',
+  stockMove:'stock.move', stkDir:'stock.move', saveStock:'stock.move', cancelStock:'stock.move', delMove:'stock.delete',
   newCari:'caris.add', quickCari:'caris.add', editCari:'caris.edit', delCari:'caris.delete',
   delPay:'payments.delete',
   repPreset:'reports.view', repType:'reports.view', copyRep:'reports.view', repMethod:'payrep.view', copyPay:'payrep.view',
@@ -1237,15 +1238,61 @@ function stockSub(p){
   var bits = [p.code, p.barcode].filter(Boolean).map(esc).join(' · '), tg = attrTags(p);
   return (bits ? '<div class="muted" style="font-size:12px">' + bits + '</div>' : '') + (hasVar(p) ? '<div class="muted" style="font-size:12px">' + esc(varSummary(p)) + ' <button type="button" class="btn sm" data-act="varStock" data-id="' + p.id + '">Varyant stokları</button></div>' : '') + (tg ? '<div style="margin-top:2px">' + tg + '</div>' : '');
 }
+/* Ortalama alış maliyeti: alış belgelerindeki net birim maliyetlerin miktarla ağırlıklı ortalaması (alış iadeleri düşülür).
+   Hiç alış yapılmamış ürünlerde (örn. yalnızca açılış stoğu) ürün kartındaki alış fiyatı kullanılır. Tutarlar KDV dahildir. */
+function avgCostMap(){
+  var tq = {}, ta = {};
+  db.docs.forEach(function(d){
+    if(d.type !== 'purchase' && d.type !== 'pret') return;
+    var sg = d.type === 'purchase' ? 1 : -1;
+    d.lines.forEach(function(l){ var q = num(l.qty); if(!(q > 0)) return; tq[l.pid] = (tq[l.pid] || 0) + sg * q; ta[l.pid] = (ta[l.pid] || 0) + sg * lt(l); });
+  });
+  var out = {};
+  db.products.forEach(function(p){ out[p.id] = tq[p.id] > 0.0001 ? Math.round(ta[p.id] / tq[p.id] * 10000) / 10000 : (Number(p.cost) || 0); });
+  return out;
+}
+/* Satış satırlarının maliyeti (kâr hesabı): satış tarihine kadarki alışların ağırlıklı ortalaması (hareketli ortalama, indirimler düşülmüş, KDV dahil).
+   Sonradan yapılan alışlar eski satışların kârını değiştirmez. O güne kadar alış yoksa (örn. açılış stoğu satıldı) satırda kayıtlı maliyet kullanılır.
+   Bağlı satış iadesi, ilk satışın maliyetiyle; bağlantısız iade, iade gününün ortalamasıyla hesaplanır. */
+function saleCosts(){
+  var cost = new Map(), tq = {}, ta = {}, byId = {};
+  var docs = db.docs.slice().sort(function(a, b){ return a.date.localeCompare(b.date) || (a.ts || 0) - (b.ts || 0); });
+  docs.forEach(function(d){ byId[d.id] = d; });
+  var avg = function(pid, fb){ return tq[pid] > 0.0001 ? ta[pid] / tq[pid] : fb; };
+  docs.forEach(function(d){
+    if(d.type === 'purchase' || d.type === 'pret'){
+      var sg = d.type === 'purchase' ? 1 : -1;
+      d.lines.forEach(function(l){ var q = num(l.qty); if(!(q > 0)) return; tq[l.pid] = (tq[l.pid] || 0) + sg * q; ta[l.pid] = (ta[l.pid] || 0) + sg * lt(l); });
+    } else if(d.type === 'sale'){
+      d.lines.forEach(function(l){ cost.set(l, avg(l.pid, Number(l.cost) || 0)); });
+    } else if(d.type === 'sret'){
+      var od = d.ref ? byId[d.ref] : null;
+      d.lines.forEach(function(l){
+        var c = null;
+        if(od){ var ol = od.lines.find(function(x){ return x.pid === l.pid && nv(x.cl) === nv(l.cl) && nv(x.sz) === nv(l.sz); }); if(ol && cost.has(ol)) c = cost.get(ol); }
+        cost.set(l, c != null ? c : avg(l.pid, Number(l.cost) || 0));
+      });
+    }
+  });
+  return cost;
+}
+/* Ürünün en son alış ve satış belgesindeki net (indirimler düşülmüş, KDV dahil) birim fiyatı */
+function lastNetMap(){
+  var buy = {}, sell = {};
+  db.docs.filter(function(d){ return d.type === 'purchase' || d.type === 'sale'; }).sort(function(a, b){ return a.date.localeCompare(b.date) || (a.ts || 0) - (b.ts || 0); }).forEach(function(d){
+    d.lines.forEach(function(l){ var q = num(l.qty); if(!(q > 0)) return; var u = Math.round(lt(l) / q * 10000) / 10000; if(d.type === 'purchase') buy[l.pid] = u; else sell[l.pid] = u; });
+  });
+  return {buy:buy, sell:sell};
+}
 function stockTable(){
   if(!db.products.length) return '<div class="empty">Önce ürün kartı açın.</div>';
   var ps = db.products.filter(stockMatch).sort(function(a, b){ return a.name.localeCompare(b.name, 'tr'); });
   if(!ps.length) return '<div class="empty">Aramanıza uyan ürün yok.</div>';
-  var val = sum(ps, function(p){ return stockOf(p.id) * p.cost; });
-  return '<div class="muted" style="margin-bottom:6px">' + ps.length + ' ürün' + (can('cost') ? ' · toplam stok değeri ' + money(val) : '') + '</div>' +
+  var ac = avgCostMap(), val = sum(ps, function(p){ return stockOf(p.id) * ac[p.id]; });
+  return '<div class="muted" style="margin-bottom:6px">' + ps.length + ' ürün' + (can('cost') ? ' · toplam stok değeri ' + money(val) + ' (ortalama alış maliyetiyle)' : '') + '</div>' +
     '<div class="tbl"><table><thead><tr><th>Ürün</th><th class="r">Stok</th>' + (can('cost') ? '<th class="r">Stok değeri (alış)</th>' : '') + '<th></th></tr></thead><tbody>' + ps.map(function(p){
       var s = stockOf(p.id);
-      return '<tr><td>' + esc(p.name) + stockSub(p) + '</td><td class="r"><span class="tag ' + (s <= 0 ? 'bad' : (p.min > 0 && s <= p.min) ? 'warn' : 'move') + '">' + qf(s) + ' ' + esc(p.unit) + '</span></td>' + (can('cost') ? '<td class="r">' + money(s * p.cost) + '</td>' : '') + '<td class="r">' + (can('stockmove') ? '<button class="btn sm" data-act="stockMove" data-dir="in" data-pid="' + p.id + '">Giriş</button> <button class="btn sm" data-act="stockMove" data-dir="out" data-pid="' + p.id + '">Çıkış</button>' : '') + '</td></tr>';
+      return '<tr><td>' + esc(p.name) + stockSub(p) + '</td><td class="r"><span class="tag ' + (s <= 0 ? 'bad' : (p.min > 0 && s <= p.min) ? 'warn' : 'move') + '">' + qf(s) + ' ' + esc(p.unit) + '</span></td>' + (can('cost') ? '<td class="r">' + money(s * ac[p.id]) + '<div class="muted" style="font-size:12px">ort. ' + money(ac[p.id]) + '</div></td>' : '') + '<td class="r">' + (can('stockmove') ? '<button class="btn sm" data-act="stockMove" data-dir="in" data-pid="' + p.id + '">Giriş</button> <button class="btn sm" data-act="stockMove" data-dir="out" data-pid="' + p.id + '">Çıkış</button>' : '') + '</td></tr>';
     }).join('') + '</tbody></table></div>';
 }
 function stockMoves(){
@@ -1253,51 +1300,70 @@ function stockMoves(){
   var mv = db.moves.filter(function(m){ var p = prod(m.pid); return p ? stockMatch(p) : !on; }).sort(function(a, b){ return b.date.localeCompare(a.date) || b.ts - a.ts; });
   var shown = mv.slice(0, 100);
   if(!shown.length) return '<div class="empty">' + (on ? 'Aramanıza uyan hareket yok.' : 'Hareket yok.') + '</div>';
-  return '<div class="tbl"><table><thead><tr><th>Tarih</th><th>Ürün</th><th>Neden</th><th class="r">Miktar</th><th></th></tr></thead><tbody>' + shown.map(function(m){
+  var ln = lastNetMap(), cst = can('cost'), nm = function(v){ return v == null ? '<span class="muted">—</span>' : money(v); };
+  return '<div class="tbl"><table><thead><tr><th>Tarih</th><th>Ürün</th><th>Neden</th><th class="r">Miktar</th>' + (cst ? '<th class="r" title="En son alış belgesindeki net birim fiyat (indirimler düşülmüş, KDV dahil)">Son net alış</th>' : '') + '<th class="r" title="En son satış belgesindeki net birim fiyat (indirimler düşülmüş, KDV dahil)">Son net satış</th><th></th></tr></thead><tbody>' + shown.map(function(m){
     var p = prod(m.pid);
-    return '<tr><td class="nw">' + fd(m.date) + '</td><td>' + esc(p ? p.name : '(silinmiş ürün)') + (m.cl || m.sz ? ' <span class="tag move">' + esc(varLabel(m.cl, m.sz)) + '</span>' : '') + (p && (p.code || p.barcode) ? '<div class="muted" style="font-size:12px">' + [p.code, p.barcode].filter(Boolean).map(esc).join(' · ') + '</div>' : '') + '</td><td>' + esc(m.reason) + (m.no ? ' <span class="muted">' + esc(m.no) + '</span>' : '') + (m.note ? ' <span class="muted">· ' + esc(m.note) + '</span>' : '') + (m.by ? ' <span class="muted">· ' + esc(userName(m.by)) + '</span>' : '') + '</td><td class="r ' + (m.qty > 0 ? 'pos' : 'neg') + '">' + (m.qty > 0 ? '+' : '') + qf(m.qty) + '</td><td class="r">' + (m.ref || !can('stock.delete') ? '' : '<button class="btn sm danger" data-act="delMove" data-id="' + m.id + '">Sil</button>') + '</td></tr>';
+    return '<tr><td class="nw">' + fd(m.date) + '</td><td>' + esc(p ? p.name : '(silinmiş ürün)') + (m.cl || m.sz ? ' <span class="tag move">' + esc(varLabel(m.cl, m.sz)) + '</span>' : '') + (p && (p.code || p.barcode) ? '<div class="muted" style="font-size:12px">' + [p.code, p.barcode].filter(Boolean).map(esc).join(' · ') + '</div>' : '') + '</td><td>' + esc(m.reason) + (m.no ? ' <span class="muted">' + esc(m.no) + '</span>' : '') + (m.note ? ' <span class="muted">· ' + esc(m.note) + '</span>' : '') + (m.by ? ' <span class="muted">· ' + esc(userName(m.by)) + '</span>' : '') + '</td><td class="r ' + (m.qty > 0 ? 'pos' : 'neg') + '">' + (m.qty > 0 ? '+' : '') + qf(m.qty) + '</td>' + (cst ? '<td class="r">' + nm(ln.buy[m.pid]) + '</td>' : '') + '<td class="r">' + nm(ln.sell[m.pid]) + '</td><td class="r">' + (m.ref || !can('stock.delete') ? '' : '<button class="btn sm danger" data-act="delMove" data-id="' + m.id + '">Sil</button>') + '</td></tr>';
   }).join('') + '</tbody></table></div>' + (mv.length > shown.length ? '<div class="muted">İlk 100 hareket gösteriliyor, toplam ' + mv.length + ' hareket var. Aramayı daraltın.</div>' : '');
 }
 function stRefresh(){ var a = $('#stlist'), b = $('#stmoves'); if(a) a.innerHTML = stockTable(); if(b) b.innerHTML = stockMoves(); }
 V.stock = function(){
+  if(state.ed.stock) return stockEditorHTML(state.ed.stock);
   return '<div class="bar"><h2>Stok</h2><span class="spacer"></span>' + (can('stockmove') ? '<button class="btn" data-act="stockMove" data-dir="out">Stok çıkışı</button><button class="btn pri" data-act="stockMove" data-dir="in">Stok girişi</button>' : '') + '</div>' +
-  '<div class="legend">Satış ve alışlar stoğu otomatik günceller. Sayım farkı, fire, hasar gibi durumlar için elle giriş veya çıkış yapın. Arama ve süzgeçler hem ürün listesini hem de stok hareketlerini daraltır.</div>' +
+  '<div class="legend">Satış ve alışlar stoğu otomatik günceller. Sayım farkı, fire, hasar gibi durumlar için elle giriş veya çıkış yapın (birden fazla ürünü tek seferde girebilirsiniz). Arama ve süzgeçler hem ürün listesini hem de stok hareketlerini daraltır.' + (can('cost') ? ' Stok değeri, alış belgelerindeki net birim maliyetlerin ağırlıklı ortalamasıyla hesaplanır (alış yoksa ürün kartındaki alış fiyatı). Son net alış ve satış, ürünün en son belgesindeki indirimler düşülmüş KDV dahil birim fiyatıdır.' : ' Son net satış, ürünün en son satış belgesindeki indirimler düşülmüş KDV dahil birim fiyatıdır.') + '</div>' +
   stockFilters() + '<div id="stlist">' + stockTable() + '</div>' +
   '<div class="bar" style="margin-top:6px"><h3 style="margin:0">Stok hareketleri</h3></div><div id="stmoves">' + stockMoves() + '</div>';
 };
 
-function svHtml(p){
-  if(!p || !hasVar(p)) return '';
-  var vb = vbits(p), un = Math.abs(stockV(p.id, '', '')) > 0.0001, h = '<div class="cols">';
-  if(vb.c.length) h += fld('Renk', '<select name="cl"><option value="">' + (un ? '(atanmamış stok)' : '— seçin —') + '</option>' + vb.c.map(function(c){ return '<option value="' + esc(c) + '">' + esc(catLabel('color', c)) + '</option>'; }).join('') + '</select>');
-  if(vb.s.length) h += fld('Beden', '<select name="sz"><option value="">' + (un ? '(atanmamış stok)' : '— seçin —') + '</option>' + vb.s.map(function(z){ return '<option value="' + esc(z) + '">' + esc(catLabel('size', z)) + '</option>'; }).join('') + '</select>');
-  return h + '</div>' + (un ? '<div class="muted" style="font-size:12px;margin:-4px 0 8px">Renk/beden atanmamış stok var. Seçim yapmazsanız bu stoğa işlenir.</div>' : '');
+var STK_REASONS = ['Sayım farkı', 'Fire / zayiat', 'Hasar', 'İade', 'Düzeltme', 'Diğer'];
+function stkInfo(ed, i){
+  var l = ed.lines[i], p = prod(l.pid); if(!p) return '';
+  var vb = vbits(p), hv = hasVar(p), out = ed.dir === 'out', unit = ' ' + esc(p.unit);
+  if(hv){
+    var none = !l.cl && !l.sz, un = stockV(p.id, '', '');
+    if(none) return Math.abs(un) > 0.0001 ? '<span class="muted">Renk/beden atanmamış stok: ' + qf(un) + unit + ' (seçim yapmazsanız buna işlenir)</span>' : '<span class="neg">Önce renk ve beden seçin</span> <span class="muted">· Toplam stok: ' + qf(stockOf(p.id)) + unit + '</span>';
+    var miss = [vb.c.length && !l.cl ? 'renk' : '', vb.s.length && !l.sz ? 'beden' : ''].filter(Boolean).join(' ve ');
+    if(miss) return '<span class="neg">Önce ' + miss + ' seçin</span> <span class="muted">· Toplam stok: ' + qf(stockOf(p.id)) + unit + '</span>';
+  }
+  var st = hv ? stockV(p.id, l.cl, l.sz) : stockOf(p.id), sfx = hv ? ' (' + esc(varLabel(l.cl, l.sz)) + ')' : '';
+  var need = sum(ed.lines.filter(function(x){ return vkey(x) === vkey(l); }), function(x){ return num(x.qty); });
+  if(out && need > st + 0.0001) return '<span class="neg">Stok' + sfx + ': ' + qf(st) + unit + ' (çıkış bundan fazla, stok eksiye düşer)</span>';
+  var after = r2(st + (out ? -need : need));
+  return '<span class="muted">Stok' + sfx + ': ' + qf(st) + unit + ' → ' + qf(after) + unit + '</span>';
 }
-function stockForm(dir, pid){
-  if(!db.products.length){ toast('Önce ürün kartı açın', 'err'); return; }
-  var reasons = ['Sayım farkı','Fire / zayiat','Hasar','İade','Düzeltme','Diğer'];
-  modal('Elle stok hareketi',
-    fld('Ürün', '<select name="pid" required>' + db.products.map(function(p){ return '<option value="' + p.id + '"' + (p.id === pid ? ' selected' : '') + '>' + esc(p.name) + ' (stok ' + qf(stockOf(p.id)) + ')</option>'; }).join('') + '</select>') +
-    '<div id="svsel">' + svHtml(prod(pid || db.products[0].id)) + '</div>' +
-    '<div class="cols">' +
-      fld('Yön', '<select name="dir"><option value="in"' + (dir === 'in' ? ' selected' : '') + '>Giriş (+)</option><option value="out"' + (dir === 'out' ? ' selected' : '') + '>Çıkış (−)</option></select>') +
-      fld('Miktar', '<input name="qty" type="number" step="any" min="0" required>') +
-      fld('Neden', '<select name="reason">' + reasons.map(function(r){ return '<option>' + r + '</option>'; }).join('') + '</select>') +
-      fld('Tarih', '<input name="date" type="date" value="' + today() + '">') +
-    '</div>' + fld('Not', '<input name="note" placeholder="İsteğe bağlı">'),
-    function(f){
-      var q = num(f.qty);
-      if(q <= 0){ toast('Miktar girin', 'err'); return false; }
-      var p = prod(f.pid), cl = f.cl || '', sz = f.sz || '';
-      if(p && hasVar(p)){
-        var vb = vbits(p), none = !cl && !sz;
-        if(none ? !(Math.abs(stockV(p.id, '', '')) > 0.0001) : ((vb.c.length && !cl) || (vb.s.length && !sz))){ toast('Renk ve beden seçin', 'err'); return false; }
-      } else { cl = ''; sz = ''; }
-      var mv = {id:uid(), pid:f.pid, qty:f.dir === 'in' ? q : -q, date:f.date || today(), reason:f.reason, note:f.note.trim(), by:(cur() || {}).id || '', ts:Date.now()};
-      if(cl) mv.cl = cl; if(sz) mv.sz = sz;
-      db.moves.push(mv);
-      commit(); toast('Stok hareketi kaydedildi');
-    });
+function stkTotal(ed){ return r2(sum(ed.lines.filter(function(l){ return l.pid; }), function(l){ return num(l.qty); })); }
+function stockEditorHTML(ed){
+  var out = ed.dir === 'out';
+  var sw = '<div class="chips">' + [['in', 'Stok girişi'], ['out', 'Stok çıkışı']].map(function(k){ return '<button type="button" class="chip' + (k[0] === ed.dir ? ' on' : '') + '" data-act="stkDir" data-dir="' + k[0] + '">' + k[1] + '</button>'; }).join('') + '</div>';
+  var lines = ed.lines.map(function(l, i){
+    return '<div class="line stk">' +
+      '<div><select data-ed="stock" data-i="' + i + '" data-f="pid"><option value="">Ürün seçin</option>' + db.products.map(function(p){ return '<option value="' + p.id + '"' + (l.pid === p.id ? ' selected' : '') + '>' + esc(p.name) + (p.barcode ? ' · ' + esc(p.barcode) : (p.code ? ' (' + esc(p.code) + ')' : '')) + '</option>'; }).join('') + '</select>' + variantSel('stock', ed, i, l) + '<div class="wn" id="w' + i + '">' + stkInfo(ed, i) + '</div></div>' +
+      '<input type="number" inputmode="decimal" step="any" min="0" placeholder="Miktar" value="' + esc(l.qty) + '" data-ed="stock" data-i="' + i + '" data-f="qty" aria-label="Miktar">' +
+      '<button type="button" class="x" data-act="rmLine" data-type="stock" data-i="' + i + '" aria-label="Satırı sil">×</button></div>';
+  }).join('');
+  return '<div class="bar"><h2>' + (out ? 'Stok çıkışı' : 'Stok girişi') + '</h2><span class="spacer"></span>' + sw + '</div>' +
+    '<div class="hint">' + (out ? 'Stoktan düşülecek ürünleri ekleyin: sayım farkı, fire, hasar gibi durumlar için. Her satır ayrı bir stok hareketi olur.' : 'Stoğa eklenecek ürünleri ekleyin: sayım farkı, düzeltme gibi durumlar için. Her satır ayrı bir stok hareketi olur.') + ' Barkod okutarak da ekleyebilirsiniz.</div>' +
+    '<div class="card"><div class="cols">' +
+      fld('Neden', '<select data-ed="stock" data-f="reason">' + STK_REASONS.map(function(r){ return '<option' + (ed.reason === r ? ' selected' : '') + '>' + esc(r) + '</option>'; }).join('') + '</select>') +
+      fld('Tarih', '<input type="date" value="' + esc(ed.date) + '" data-ed="stock" data-f="date">') +
+    '</div>' +
+    '<h3>Ürünler</h3><div class="scanrow"><input id="scan" data-scan="stock" placeholder="Barkod okutun veya kodu yazıp Enter’a basın" autocomplete="off"></div>' +
+    '<div class="lines">' + lines + '</div>' +
+    '<div style="margin-top:10px"><button type="button" class="btn sm" data-act="addLine" data-type="stock">+ Satır ekle</button></div>' +
+    '<div class="totals"><div><div class="muted">Toplam miktar</div><div class="big" id="stk_tot">' + qf(stkTotal(ed)) + '</div></div></div>' +
+    '<div style="margin-top:12px">' + fld('Not', '<input type="text" value="' + esc(ed.note) + '" data-ed="stock" data-f="note" placeholder="İsteğe bağlı">') + '</div>' +
+    '<div class="row-end"><button class="btn" data-act="cancelStock">Vazgeç</button><button class="btn pri" data-act="saveStock">' + (out ? 'Çıkışı kaydet' : 'Girişi kaydet') + '</button></div></div>';
+}
+function stkOnEd(t, ed){
+  var f = t.dataset.f;
+  if(t.dataset.i !== undefined){
+    var i = +t.dataset.i, l = ed.lines[i]; if(!l) return;
+    l[f] = t.value;
+    if(f === 'pid'){ l.cl = ''; l.sz = ''; render(); return; }
+    if(f === 'cl' || f === 'sz'){ render(); return; }
+    ed.lines.forEach(function(x, k){ var w = $('#w' + k); if(w) w.innerHTML = stkInfo(ed, k); });
+  } else ed[f] = t.value;
+  var tt = $('#stk_tot'); if(tt) tt.textContent = qf(stkTotal(ed));
 }
 
 /* Cariler */
@@ -1450,7 +1516,8 @@ V.reports = function(){
   var tot = function(a){ return sum(a, function(x){ return x.total; }); };
   var vt = function(a){ return sum(a, function(x){ return vatSplit(x.lines).vat; }); };
   var nt = function(a){ return sum(a, function(x){ return vatSplit(x.lines).net; }); };
-  var pf = function(a){ return sum(a, function(x){ return sum(x.lines, function(l){ return (lt(l) - l.qty * l.cost) / (1 + num(l.vat) / 100); }); }); };
+  var sc = saleCosts(), lc = function(l){ return sc.has(l) ? sc.get(l) : (Number(l.cost) || 0); };
+  var pf = function(a){ return sum(a, function(x){ return sum(x.lines, function(l){ return (lt(l) - l.qty * lc(l)) / (1 + num(l.vat) / 100); }); }); };
   var sT = tot(sales) - tot(srets), bT = tot(buys) - tot(prets);
   var profit = pf(sales) - pf(srets), sNet = nt(sales) - nt(srets);
   var sV = vt(sales) - vt(srets), bV = vt(buys) - vt(prets);
@@ -1467,7 +1534,7 @@ V.reports = function(){
   var pm = {};
   d.docs.forEach(function(x){ x.lines.forEach(function(l){
     var o = pm[l.pid] || (pm[l.pid] = {sq:0, sr:0, sp:0, bq:0, br:0});
-    var g = lt(l), pr = (lt(l) - l.qty * l.cost) / (1 + num(l.vat) / 100);
+    var g = lt(l), pr = (lt(l) - l.qty * lc(l)) / (1 + num(l.vat) / 100);
     if(x.type === 'sale'){ o.sq += l.qty; o.sr += g; o.sp += pr; }
     else if(x.type === 'sret'){ o.sq -= l.qty; o.sr -= g; o.sp -= pr; }
     else if(x.type === 'purchase'){ o.bq += l.qty; o.br += g; }
@@ -1487,7 +1554,7 @@ V.reports = function(){
   '<div class="grid">' +
     '<div class="stat sale"><div class="l">Net satış (iade düşülmüş)</div><div class="v">' + money(sT) + '</div><div class="s">' + sales.length + ' satış' + (srets.length ? ' · ' + srets.length + ' iade (' + money(tot(srets)) + ')' : '') + '</div></div>' +
     '<div class="stat buy"><div class="l">Net alış (iade düşülmüş)</div><div class="v">' + money(bT) + '</div><div class="s">' + buys.length + ' alış' + (prets.length ? ' · ' + prets.length + ' iade (' + money(tot(prets)) + ')' : '') + '</div></div>' +
-    (can('reports.profit') ? '<div class="stat sale"><div class="l">Brüt kâr (tahmini)</div><div class="v">' + money(profit) + '</div><div class="s">' + (sNet > 0 ? 'KDV hariç, %' + (profit / sNet * 100).toFixed(1).replace('.', ',') + ' marj' : 'Satış yok') + '</div></div>' : '') +
+    (can('reports.profit') ? '<div class="stat sale"><div class="l">Brüt kâr (tahmini)</div><div class="v">' + money(profit) + '</div><div class="s">' + (sNet > 0 ? 'KDV hariç, %' + (profit / sNet * 100).toFixed(1).replace('.', ',') + ' marj · ortalama maliyetle' : 'Satış yok') + '</div></div>' : '') +
     '<div class="stat in"><div class="l">Kasa girişi</div><div class="v">' + money(k.inn) + '</div></div>' +
     '<div class="stat out"><div class="l">Kasa çıkışı</div><div class="v">' + money(k.out) + '</div></div>' +
     '<div class="stat neu"><div class="l">Net kasa</div><div class="v">' + money(k.net) + '</div><div class="s">Nakit, kart ve havale dağılımı için Ödeme Raporu sekmesi</div></div>' +
@@ -1679,7 +1746,7 @@ A.vgrid = function(d){
   if(!p || !hasVar(p)) return;
   var vb = vbits(p), cols = vb.s.length ? vb.s : [''], rows = vb.c.length ? vb.c : [''], cur0 = {};
   ed.lines.forEach(function(x){ if(x.pid === p.id) cur0[nv(x.cl) + '|' + nv(x.sz)] = (cur0[nv(x.cl) + '|' + nv(x.sz)] || 0) + num(x.qty); });
-  var showSt = TYPES[type].stock < 0;
+  var showSt = type === 'stock' ? ed.dir === 'out' : TYPES[type].stock < 0;
   modal('Renk / beden dağılımı · ' + p.name,
     '<div class="hint">Her renk ve beden için adet girin. Boş veya 0 olanlar eklenmez. Bu ürünün editördeki satırları bu tabloyla değiştirilir.' + (showSt ? ' Gri rakamlar mevcut stoktur.' : '') + '</div>' +
     '<div class="tbl"><table><thead><tr><th>' + (vb.c.length ? 'Renk' : '') + (vb.c.length && vb.s.length ? ' \\ ' : '') + (vb.s.length ? 'Beden' : '') + '</th>' + cols.map(function(c){ return '<th class="r">' + esc(c ? catLabel('size', c) : '—') + '</th>'; }).join('') + '</tr></thead><tbody>' +
@@ -1783,8 +1850,42 @@ A.delProduct = function(d){
     db.caris.forEach(function(c){ if(c.prices && c.prices[d.id] != null){ delete c.prices[d.id]; if(!Object.keys(c.prices).length) delete c.prices; } });
     db.products = db.products.filter(function(p){ return p.id !== d.id; }); db.moves = db.moves.filter(function(m){ return m.pid !== d.id; }); commit(); toast('Ürün silindi'); });
 };
-A.stockMove = function(d){ stockForm(d.dir, d.pid); };
 A.delMove = function(d){ confirmBox('Bu stok hareketi silinecek.', function(){ db.moves = db.moves.filter(function(m){ return m.id !== d.id; }); commit(); }); };
+A.stockMove = function(d){
+  if(!db.products.length){ toast('Önce ürün kartı açın', 'err'); return; }
+  state.ed.stock = {dir:d.dir === 'out' ? 'out' : 'in', date:today(), reason:STK_REASONS[0], note:'', lines:[{pid:d.pid || '', qty:1, cl:'', sz:''}]};
+  state.tab = 'stock'; render(); window.scrollTo(0, 0);
+};
+A.stkDir = function(d){ var ed = state.ed.stock; if(ed){ ed.dir = d.dir === 'out' ? 'out' : 'in'; render(); } };
+A.cancelStock = function(){ state.ed.stock = null; render(); };
+A.saveStock = function(){
+  var ed = state.ed.stock; if(!ed) return;
+  if(!can('stockmove')){ toast('Bu işlem için yetkiniz yok', 'err'); return; }
+  var out = ed.dir === 'out', items = [], bad = null;
+  ed.lines.forEach(function(l, i){
+    if(bad || !l.pid) return;                                     // ürün seçilmemiş satırlar atlanır
+    var p = prod(l.pid); if(!p) return;
+    var who = 'Satır ' + (i + 1) + ' (' + p.name + '): ', q = num(l.qty), cl = l.cl || '', sz = l.sz || '';
+    if(!(q > 0)){ bad = who + 'miktar girin'; return; }
+    if(hasVar(p)){
+      var vb = vbits(p), none = !cl && !sz;
+      if(none){ if(!(Math.abs(stockV(p.id, '', '')) > 0.0001)){ bad = who + 'renk ve beden seçin'; return; } }
+      else if((vb.c.length && !cl) || (vb.s.length && !sz)){ bad = who + 'renk ve beden seçin'; return; }
+      else if((vb.c.length && vb.c.indexOf(cl) < 0) || (vb.s.length && vb.s.indexOf(sz) < 0)){ bad = who + 'renk veya beden bu üründe tanımlı değil'; return; }
+    } else { cl = ''; sz = ''; }
+    items.push({p:p, q:q, cl:cl, sz:sz});
+  });
+  if(bad){ toast(bad, 'err'); return; }
+  if(!items.length){ toast('En az bir ürün ve miktar girin', 'err'); return; }
+  var ts = Date.now(), by = (cur() || {}).id || '', note = String(ed.note || '').trim();
+  items.forEach(function(it, k){
+    var mv = {id:uid(), pid:it.p.id, qty:out ? -it.q : it.q, date:ed.date || today(), reason:ed.reason, note:note, by:by, ts:ts + k};
+    if(it.cl) mv.cl = it.cl; if(it.sz) mv.sz = it.sz;
+    db.moves.push(mv);
+  });
+  state.ed.stock = null; commit(); toast(items.length + ' satır stok ' + (out ? 'çıkışı' : 'girişi') + ' kaydedildi');
+};
+
 A.newCari = function(){ cariForm(); };
 A.editCari = function(d){ cariForm(d.id); };
 A.cariPrices = function(d){ cariPriceForm(d.id); };
@@ -1889,6 +1990,7 @@ document.addEventListener('click', function(e){
 function onEd(e){
   var t = e.target, type = t.dataset.ed; if(!type) return;
   var ed = state.ed[type]; if(!ed) return;
+  if(type === 'stock'){ stkOnEd(t, ed); return; }
   var f = t.dataset.f;
   if(t.dataset.i !== undefined){
     var l = ed.lines[+t.dataset.i];
@@ -1931,7 +2033,7 @@ document.addEventListener('keydown', function(e){
   var ex = ed.lines.find(function(l){ return l.pid === p.id && (vh ? (nv(l.cl) === hit.cl && nv(l.sz) === hit.sz) : (!hv0 || (!l.cl && !l.sz))); });   // varyantlı üründe renk/beden seçilmiş satıra eklenmez
   if(ex){ ex.qty = String(num(ex.qty) + 1); }
   else {
-    var price = lineDefault(type, ed, p);
+    var price = type === 'stock' ? '' : lineDefault(type, ed, p);
     var blank = ed.lines.find(function(l){ return !l.pid; });
     if(blank){ blank.pid = p.id; blank.qty = 1; blank.price = price; blank.noCamp = false; blank.cl = vh ? hit.cl : ''; blank.sz = vh ? hit.sz : ''; }
     else { var nl = {pid:p.id, qty:1, price:price}; if(vh){ nl.cl = hit.cl; nl.sz = hit.sz; } ed.lines.push(nl); }
@@ -1978,7 +2080,6 @@ document.addEventListener('change', function(e){
   if((t.name === 'type' || t.name === 'scope' || t.name === 'aud') && $('#mf')) campToggle();
   if($('#mf') && /^(pid|av|cid):/.test(t.name || '')) campCount();
   if(t.dataset && t.dataset.vg !== undefined) vgRefresh();
-  if(t.name === 'pid' && $('#svsel')) $('#svsel').innerHTML = svHtml(prod(t.value));
   if(t.tagName === 'SELECT') onEd(e);
 });
 
@@ -2819,7 +2920,7 @@ var LBL_PRESETS = {
   'custom':{label:'Özel ölçü'}
 };
 var LBL_DEF = {preset:'a4-3x8', mode:'a4', w:63.5, h:33.9, cols:3, gapX:2.5, gapY:0, mTop:12.9, mLeft:7.2, pad:1.5, align:'center',
-  company:false, logo:false, name:true, attrs:[false, false, false, false, false], barcode:true, digits:true, code:true, price:true,
+  company:false, logo:false, name:true, attrs:[false, false, false, false, false], barcode:true, digits:true, code:true, price:true, vcl:true, vsz:true,
   nameSize:9, priceSize:12, smallSize:7, nameLines:2, bw:36, bh:9.5, border:true};
 var LBL_RANGE = {w:[15, 210], h:[10, 297], cols:[1, 8], gapX:[0, 30], gapY:[0, 30], mTop:[0, 60], mLeft:[0, 60], pad:[0, 15], nameSize:[5, 40], priceSize:[5, 48], smallSize:[4, 24], nameLines:[1, 4], bw:[15, 120], bh:[4, 40]};
 function lbClamp(o){
@@ -2866,7 +2967,12 @@ function labelHTML(p, o, v){
   if(o.logo && logoSrc()) h += '<img class="l-lg" src="' + logoSrc() + '" alt="">';
   if(o.company && st.name) h += '<div class="l-co">' + esc(st.name) + '</div>';
   if(o.name) h += '<div class="l-nm">' + esc(p.name) + '</div>';
-  if(v && (v.cl || v.sz)) h += '<div class="l-vr">' + esc(varLabel(v.cl, v.sz)) + '</div>';
+  if(v){                                                       // renk ve beden: tasarımdaki seçeneklere göre
+    var vp = [];
+    if(o.vcl && v.cl) vp.push(catLabel('color', v.cl));
+    if(o.vsz && v.sz) vp.push(catLabel('size', v.sz));
+    if(vp.length) h += '<div class="l-vr">' + esc(vp.join(' / ')) + '</div>';
+  }
   var parts = [];
   o.attrs.forEach(function(on, i){ if(on && p.attrs && p.attrs[i]) parts.push(attrLabel(i, p.attrs[i])); });
   if(parts.length) h += '<div class="l-at">' + esc(parts.join(' · ')) + '</div>';
@@ -2887,6 +2993,10 @@ function lbWarn(){
     pv.appendChild(d);
   }
 }
+function sampleVar(){                                          // önizleme ve test etiketinde renk/beden örneği
+  var c = varCat('color')[0], z = varCat('size')[0];
+  return {cl:c ? c.c : 'Kırmızı', sz:z ? z.c : 'M', bc:sampleProd().barcode};
+}
 function sampleProd(){
   var p = db.products.find(function(x){ return x.barcode; });
   return p || {name:'Örnek Ürün Adı 500 g', code:'ORN-001', barcode:'2900000000018', price:249.9, attrs:['', '', '', '', '']};
@@ -2897,7 +3007,7 @@ function lbPreviewHTML(o){
     ? 'A4 sayfada yaklaşık ' + o.cols + ' sütun × ' + rows + ' satır = ' + (o.cols * rows) + ' etiket'
     : 'Rulo / termal: her etiket ayrı bir sayfa olarak yazdırılır';
   var warn = (o.mode === 'a4' && (o.cols * o.w + (o.cols - 1) * o.gapX + 2 * o.mLeft > 210.5)) ? '<div class="neg" style="font-size:13px;margin-top:4px">Etiketler sayfa genişliğine (210 mm) sığmıyor. Sütun sayısını, etiket genişliğini veya kenar boşluğunu azaltın.</div>' : '';
-  return '<div class="lbls2">' + labelHTML(sampleProd(), o) + '</div><div class="muted" style="font-size:12px;margin-top:6px">Önizleme gerçek ölçüdedir (ekran çözünürlüğüne göre küçük sapabilir). ' + esc(info) + '.</div>' + warn;
+  return '<div class="lbls2">' + labelHTML(sampleProd(), o, sampleVar()) + '</div><div class="muted" style="font-size:12px;margin-top:6px">Önizleme gerçek ölçüdedir (ekran çözünürlüğüne göre küçük sapabilir). ' + esc(info) + '.</div>' + warn;
 }
 function lblCard(){
   var o = lblOpt(), names = attrNames();
@@ -2915,7 +3025,7 @@ function lblCard(){
     '<div class="cols3">' + nf('nameSize', 'Ürün adı yazı boyutu (pt)', '0.5') + nf('priceSize', 'Fiyat yazı boyutu (pt)', '0.5') + nf('smallSize', 'Diğer yazılar (pt)', '0.5') + '</div>' +
     '<div class="cols3">' + nf('nameLines', 'Ürün adı en çok satır', '1') + nf('bw', 'Barkod genişliği (mm)', '0.5') + nf('bh', 'Barkod çizgi yüksekliği (mm)', '0.5') + '</div>' +
     '<div class="pgrp" style="margin-bottom:12px"><div class="pgt">Etikette basılacak bilgiler</div><div class="permgrid">' +
-      ck('name', 'Ürün adı', o.name) + ck('barcode', 'Barkod (çizgiler)', o.barcode) + ck('digits', 'Barkod numarası (rakamlar)', o.digits) + ck('code', 'Ürün kodu', o.code) + ck('price', 'Fiyat', o.price) + ck('company', 'Firma adı', o.company) + ck('logo', 'Firma logosu', o.logo) + ck('border', 'Kesme çizgisi (kesikli çerçeve)', o.border) +
+      ck('name', 'Ürün adı', o.name) + ck('barcode', 'Barkod (çizgiler)', o.barcode) + ck('digits', 'Barkod numarası (rakamlar)', o.digits) + ck('code', 'Ürün kodu', o.code) + ck('price', 'Fiyat', o.price) + ck('vcl', 'Renk (varyant)', o.vcl) + ck('vsz', 'Beden (varyant)', o.vsz) + ck('company', 'Firma adı', o.company) + ck('logo', 'Firma logosu', o.logo) + ck('border', 'Kesme çizgisi (kesikli çerçeve)', o.border) +
       names.map(function(n, i){ return n ? ck('attr' + i, esc(n) + ' (özellik)', o.attrs[i]) : ''; }).join('') +
     '</div></div>' +
     '<div class="pgt" style="margin-bottom:6px">Önizleme</div><div id="lblprev" class="lblbox" style="overflow:auto;padding:12px;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;margin-bottom:12px">' + lbPreviewHTML(o) + '</div>' +
@@ -2947,7 +3057,7 @@ A.saveLbl = function(){ db.settings.lbl = lbRead(); commit(); toast('Etiket tasa
 A.lblReset = function(){ confirmBox('Etiket tasarımı varsayılana dönecek.', function(){ db.settings.lbl = null; commit(); toast('Etiket tasarımı sıfırlandı'); }, 'Sıfırla'); };
 A.lblTest = function(){
   var o = lbRead(), rows = 3, n = o.mode === 'a4' ? o.cols * rows : 2;
-  showLabels([{p:sampleProd(), n:n}], null, null, o);
+  showLabels([{p:sampleProd(), v:sampleVar(), n:n}], null, null, o);
 };
 
 /* ---------- Toplu barkod atama ---------- */
@@ -3578,7 +3688,7 @@ function applyRemote(r){
 }
 function uiBusy(){
   var ae = document.activeElement;
-  return !$('#modal').hidden || !!(state.ed.sale || state.ed.purchase || state.ed.sret || state.ed.pret) || !!(ae && /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName) && $('#app').contains(ae));
+  return !$('#modal').hidden || !!(state.ed.sale || state.ed.purchase || state.ed.sret || state.ed.pret || state.ed.stock) || !!(ae && /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName) && $('#app').contains(ae));
 }
 function maybeRender(){ if(uiBusy()){ sync.renderPending = true; return; } sync.renderPending = false; render(); }
 async function pollOnce(){
