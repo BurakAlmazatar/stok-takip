@@ -238,7 +238,7 @@ label.f>input,label.f>select,label.f>textarea{margin-top:4px;font-weight:400}
 <script>
 /* ---------- Veri ---------- */
 var KEY = 'stokcari_v1';
-var APP_VERSION = '2026.10.25-9';
+var APP_VERSION = '2026.10.25-10';
 function defaults(){ return {products:[],caris:[],docs:[],payments:[],moves:[],counters:{sale:0,purchase:0},seq:1,users:[],campaigns:[],rates:[],settings:{name:'',phone:'',address:'',taxNo:'',footer:'',logo:'',logoRcpt:false,attrVals:[[],[],[],[],[]]}}; }
 function load(){
   try{ var s = localStorage.getItem(KEY); if(s){ var o = JSON.parse(s); return Object.assign(defaults(), o); } }catch(e){}
@@ -3949,7 +3949,7 @@ A.rcNew = function(){                                          // yönetici: ge�
 A.forgot = function(){                                         // giriş ekranından: kurtarma koduyla yeni şifre
   if(SRV){ toast('Sunucu sürümünde şifreyi yönetici sıfırlar', 'err'); return; }
   modal('Şifreyi sıfırla',
-    '<div class="hint">Yönetici hesabını oluştururken veya Hesabım bölümünden aldığınız <b>kurtarma kodunu</b> girin. Kodunuz yoksa paketteki <b>SIFRE-KURTARMA.txt</b> dosyasındaki adımları izleyin. Kayıtlarınız (ürünler, cariler, belgeler) bu işlemde silinmez.</div>' +
+    '<div class="hint">Yönetici hesabını oluştururken veya Hesabım bölümünden aldığınız <b>kurtarma kodunu</b> girin. Kodunuz yoksa <a href="sifre-sifirla.html"><b>şifre sıfırlama sayfasını</b></a> açın (sayfa dosyası siteye yüklenmiş olmalı; ayrıntı: SIFRE-KURTARMA.txt). Kayıtlarınız (ürünler, cariler, belgeler) bu işlemde silinmez.</div>' +
     fld('Kullanıcı adı', '<input name="fu" autocomplete="username" autocapitalize="none" required>') +
     fld('Kurtarma kodu', '<input name="fc" autocomplete="off" autocapitalize="characters" placeholder="XXXX-XXXX-XXXX-XXXX" required>') +
     '<div class="cols">' + fld('Yeni şifre', '<input name="np" type="password" autocomplete="new-password" required>') + fld('Yeni şifre (tekrar)', '<input name="np2" type="password" autocomplete="new-password" required>') + '</div>',
@@ -3958,7 +3958,7 @@ A.forgot = function(){                                         // giriş ekranı
         var wait = lockUntil - Date.now();
         if(wait > 0){ toast('Çok fazla hatalı deneme. ' + Math.ceil(wait / 1000) + ' saniye sonra tekrar deneyin.', 'err'); return; }
         var rec = db.settings.recovery;
-        if(!rec){ toast('Bu cihazda kurtarma kodu oluşturulmamış. SIFRE-KURTARMA.txt dosyasındaki adımları izleyin.', 'err'); return; }
+        if(!rec){ toast('Bu cihazda kurtarma kodu oluşturulmamış. sifre-sifirla.html sayfasını açın ya da SIFRE-KURTARMA.txt dosyasındaki adımları izleyin.', 'err'); return; }
         var un = f.fu.trim().toLowerCase(), u = db.users.find(function(x){ return x.username === un && x.active !== false; });
         var okc = (await hashPw(recNorm(f.fc), rec.salt)) === rec.hash;
         if(!u || !okc){ loginTries++; if(loginTries >= 5){ lockUntil = Date.now() + 30000; loginTries = 0; } toast('Kullanıcı adı veya kurtarma kodu hatalı', 'err'); return; }
