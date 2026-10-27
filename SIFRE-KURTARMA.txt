@@ -1,0 +1,32 @@
+SIFRE KURTARMA (GitHub / yerel surum)
+=====================================
+
+Bu surumde kayitlariniz (urunler, cariler, belgeler) yalnizca KULLANDIGINIZ TARAYICIDA saklanir.
+Sifrenizi unuttuysaniz kayitlariniz silinmez; sifreyi asagidaki yollardan biriyle yeniden belirleyebilirsiniz.
+
+1) KURTARMA KODUNUZ VARSA (en kolay yol)
+   - Giris ekraninda "Sifremi unuttum" baglantisina tiklayin.
+   - Kullanici adinizi, kurtarma kodunuzu ve yeni sifrenizi girin.
+   Kurtarma kodu: ilk kurulumda gosterilir veya yonetici olarak girdikten sonra Hesabim > "Kurtarma kodu olustur"
+   ile alinir. Bunu simdiden olusturup guvenli bir yere yazmanizi oneririz.
+
+2) KURTARMA KODUNUZ YOKSA (bilgisayardan)
+   Uygulamayi KAYITLARINIZIN OLDUGU ayni bilgisayarda ve ayni tarayicida acin
+   (tarayici verilerini / site verilerini silmeyin; baska tarayicida kayitlariniz gorunmez).
+   a) Giris ekrani acikken klavyeden F12'ye (veya Ctrl+Shift+I) basin.
+   b) "Console" (Konsol) sekmesini secin.
+   c) Chrome ilk yapistirmada uyari verirse once  allow pasting  yazip Enter'a basin.
+   d) Asagidaki komutu yapistirin; KULLANICI_ADI ve YENI_SIFRE yerlerini kendi bilgilerinizle degistirip Enter'a basin:
+
+(async()=>{var u=db.users.find(x=>x.username==='KULLANICI_ADI');if(!u){alert('Kullanici bulunamadi. Mevcut kullanici adlari: '+db.users.map(x=>x.username).join(', '));return}u.active=true;u.salt=newSalt();u.hash=await hashPw('YENI_SIFRE',u.salt);commit();alert('Tamam. Yeni sifre ile giris yapabilirsiniz.')})()
+
+   e) Yeni sifrenizle giris yapin. Hemen Hesabim'dan sifrenizi degistirin, "Kurtarma kodu olustur" deyin
+      ve Ayarlar'dan yedek dosyasi alin.
+   Kullanici adini hatirlamiyorsaniz KULLANICI_ADI yerine herhangi bir sey yazin; komut mevcut kullanici
+   adlarini size gosterir.
+
+3) TELEFONDA veya KAYITLARIN BASKA CIHAZDA OLDUGU DURUMDA
+   Telefonlarda konsol yoktur. Daha once yedek dosyaniz (JSON) varsa bir bilgisayarda uygulamayi acip
+   "Yedek dosyasindan basla" ile yukleyin, sonra 2. adimi uygulayin.
+
+Not: Sunucu (SQL Server) surumunde sifreyi yonetici sifirlar; sunucu klasorundeki sifre-sifirla.bat kullanilir.

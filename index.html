@@ -193,6 +193,7 @@ label.f>input,label.f>select,label.f>textarea{margin-top:4px;font-weight:400}
 .payrow{display:flex;gap:6px}.payrow input{flex:1;min-width:0}.payrow select{width:88px;flex:none}
 .pq{font-size:12px;min-height:16px;margin-top:2px}
 .grid.multi .stat .v{font-size:18px}
+.rccode{font:700 22px/1.3 ui-monospace,Consolas,monospace;letter-spacing:2px;text-align:center;padding:14px;border:2px dashed var(--border);border-radius:10px;margin:10px 0;user-select:all;word-break:break-all}
 .fxbox{margin:6px 0 10px;border:1px solid var(--border);border-radius:10px;padding:8px 10px;background:var(--surface-2)}
 .fxbox summary{cursor:pointer;font-weight:600;font-size:13px}
 .chgline{margin-top:4px}.chgsel{margin-top:4px;display:flex;gap:6px;align-items:center;flex-wrap:wrap}.chgsel select{width:auto;min-width:110px}
@@ -237,7 +238,7 @@ label.f>input,label.f>select,label.f>textarea{margin-top:4px;font-weight:400}
 <script>
 /* ---------- Veri ---------- */
 var KEY = 'stokcari_v1';
-var APP_VERSION = '2026.10.25-8';
+var APP_VERSION = '2026.10.25-9';
 function defaults(){ return {products:[],caris:[],docs:[],payments:[],moves:[],counters:{sale:0,purchase:0},seq:1,users:[],campaigns:[],rates:[],settings:{name:'',phone:'',address:'',taxNo:'',footer:'',logo:'',logoRcpt:false,attrVals:[[],[],[],[],[]]}}; }
 function load(){
   try{ var s = localStorage.getItem(KEY); if(s){ var o = JSON.parse(s); return Object.assign(defaults(), o); } }catch(e){}
@@ -322,6 +323,27 @@ var ACT_PERM = {
 function userName(id){ var u = db.users.find(function(x){ return x.id === id; }); return u ? u.name : '—'; }
 function admins(){ return db.users.filter(function(u){ return u.role === 'admin' && u.active !== false; }); }
 function newSalt(){ return Math.random().toString(36).slice(2) + Date.now().toString(36); }
+/* Şifre kurtarma (yerel/GitHub sürümü): kurtarma kodunun yalnızca tuzlu özeti ayarlarda saklanır, kodun kendisi hiçbir yerde saklanmaz. */
+var RC_ALPHA = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';                // 0/O ve 1/I karışmasın
+function recNorm(c){ return String(c || '').toUpperCase().replace(/[^A-Z0-9]/g, ''); }
+function newRecoveryCode(){
+  var out = '', a = new Uint8Array(16);
+  try{ crypto.getRandomValues(a); }catch(e){ for(var i = 0; i < 16; i++) a[i] = Math.floor(Math.random() * 256); }
+  for(var j = 0; j < 16; j++){ out += RC_ALPHA[a[j] % RC_ALPHA.length]; if(j % 4 === 3 && j < 15) out += '-'; }
+  return out;
+}
+async function makeRecovery(){
+  var code = newRecoveryCode(), salt = newSalt();
+  db.settings.recovery = {salt:salt, hash:await hashPw(recNorm(code), salt), created:today()};
+  return code;
+}
+function showRecoveryCode(code){
+  modal('Kurtarma kodunuz',
+    '<div class="hint">Şifrenizi unutursanız giriş ekranındaki <b>“Şifremi unuttum”</b> bağlantısıyla bu kodu kullanarak yeni şifre belirleyebilirsiniz. <b>Bu kod bir daha gösterilmez.</b> Kâğıda yazın ya da dosyaya kaydedin ve güvenli bir yerde saklayın; kodu bilen herkes şifreyi sıfırlayabilir.</div>' +
+    '<div class="rccode">' + esc(code) + '</div>' +
+    '<div class="row-end" style="justify-content:flex-start"><button type="button" class="btn" data-act="rcCopy" data-code="' + esc(code) + '">Kopyala</button><button type="button" class="btn" data-act="rcSave" data-code="' + esc(code) + '">Dosya olarak kaydet</button></div>',
+    function(){ return true; }, 'Kodu kaydettim');
+}
 async function hashPw(pw, salt){
   var t = salt + '|' + pw;
   try{
@@ -922,6 +944,7 @@ V.panel = function(){
     (can('purchases.new') ? '<button class="btn buy" data-act="quick" data-type="purchase">+ Alış</button>' : '') +
     (can('payments.collect') ? '<button class="btn" data-act="newPay" data-dir="in">Tahsilat</button>' : '') +
     (can('payments.payout') ? '<button class="btn" data-act="newPay" data-dir="out">Ödeme</button>' : '') + '</div>' +
+    ((!SRV && can('admin') && !(db.settings && db.settings.recovery)) ? '<div class="hint">Şifrenizi unutursanız giriş yapamazsınız. <b>Kurtarma kodu</b> oluşturup güvenli bir yere kaydedin. <button class="btn sm" data-act="myAccount">Hesabım</button></div>' : '') +
     (stats ? '<div class="grid">' + stats + '</div>' : '') +
     ((left || right) ? '<div class="two"><div>' + left + '</div><div>' + right + '</div></div>' : '<div class="empty">Bu hesapta panelde gösterilecek bilgi için yetki yok. Soldaki menülerden devam edebilirsiniz.</div>');
 };
@@ -2309,7 +2332,7 @@ document.addEventListener('click', function(e){
   if(e.target.id === 'modal'){ closeModal(); return; }
   var b = e.target.closest('[data-act]'); if(!b) return;
   var act = b.dataset.act;
-  if(!cur() && act !== 'closeModal' && act !== 'retryBoot') return;
+  if(!cur() && act !== 'closeModal' && act !== 'retryBoot' && act !== 'forgot') return;
   if(SRV && (act === 'demo' || act === 'wipe' || act === 'importData')){ toast('Sunucu modunda bu işlem kullanılamaz', 'err'); return; }
   var need = ACT_PERM[act];
   if(need && !can(need)){ toast('Bu işlem için yetkiniz yok', 'err'); return; }
@@ -3868,6 +3891,7 @@ A.myAccount = function(){
   modal('Hesabım',
     '<div class="hint"><b>' + esc(u.name) + '</b> · ' + esc(u.username) + ' · ' + (u.role === 'admin' ? 'Yönetici' : 'Personel') + '<br><span class="muted">Sürüm: ' + esc(APP_VERSION) + '</span></div>' +
     '<div class="row-end" style="justify-content:flex-start;margin:0 0 14px"><button type="button" class="btn danger" data-act="logout">Oturumu kapat</button><button type="button" class="btn" data-act="theme">Tema değiştir</button><button type="button" class="btn" data-act="hardRefresh">Uygulamayı yenile</button></div>' +
+    (!SRV && u.role === 'admin' ? '<h3 style="font-size:15px">Kurtarma kodu</h3><div class="muted" style="font-size:13px;margin-bottom:6px">' + (db.settings.recovery ? 'Oluşturuldu (' + fd(db.settings.recovery.created) + '). Şifrenizi unutursanız giriş ekranından “Şifremi unuttum” ile kullanılır. Yeni kod oluşturursanız eskisi geçersiz olur.' : '<span class="neg">Henüz oluşturulmadı.</span> Şifrenizi unutursanız kurtarma kodu olmadan giriş yapamazsınız.') + '</div><div class="row-end" style="justify-content:flex-start;margin:0 0 14px"><button type="button" class="btn" data-act="rcNew">' + (db.settings.recovery ? 'Yeni kurtarma kodu oluştur' : 'Kurtarma kodu oluştur') + '</button></div>' : '') +
     '<h3 style="font-size:15px">Şifre değiştir</h3>' +
     fld('Mevcut şifre', '<input name="cp" type="password" autocomplete="current-password">') +
     '<div class="cols">' + fld('Yeni şifre', '<input name="np" type="password" autocomplete="new-password">') + fld('Yeni şifre (tekrar)', '<input name="np2" type="password" autocomplete="new-password">') + '</div>',
@@ -3903,6 +3927,49 @@ A.hardRefresh = async function(){
   }catch(e){}
   try{ location.reload(); }catch(e){}
 };
+A.rcCopy = function(d){
+  try{ navigator.clipboard.writeText(d.code).then(function(){ toast('Kopyalandı'); }, function(){ toast('Kopyalanamadı, kodu elle not edin', 'err'); }); }
+  catch(e){ toast('Kopyalanamadı, kodu elle not edin', 'err'); }
+};
+A.rcSave = async function(d){
+  var r = await saveFile('kurtarma-kodu.txt', 'Stok ve Cari Takip - şifre kurtarma kodu\r\nİşletme: ' + ((db.settings && db.settings.name) || '') + '\r\nKod: ' + d.code + '\r\nOluşturma: ' + today() + '\r\nBu dosyayı güvenli bir yerde saklayın.\r\n');
+  toast(r === 'ok' ? 'Dosya kaydedildi' : r === 'declined' ? 'İptal edildi' : 'Dosya kaydedilemedi', r === 'fail' ? 'err' : '');
+};
+A.rcNew = function(){                                          // yönetici: geçerli şifresini girerek yeni kurtarma kodu üretir
+  var u = cur(); if(!u || SRV || u.role !== 'admin') return;
+  modal('Kurtarma kodu oluştur', '<div class="hint">' + (db.settings.recovery ? 'Yeni kod oluşturulunca <b>eski kod geçersiz olur</b>. ' : '') + 'Devam etmek için şifrenizi girin.</div>' + fld('Şifreniz', '<input name="cp" type="password" autocomplete="current-password" required>'),
+    function(f){
+      (async function(){
+        if((await hashPw(f.cp, u.salt)) !== u.hash){ toast('Şifre hatalı', 'err'); return; }
+        var code = await makeRecovery(); commit(); showRecoveryCode(code);
+      })();
+      return false;
+    }, 'Kodu oluştur');
+};
+A.forgot = function(){                                         // giriş ekranından: kurtarma koduyla yeni şifre
+  if(SRV){ toast('Sunucu sürümünde şifreyi yönetici sıfırlar', 'err'); return; }
+  modal('Şifreyi sıfırla',
+    '<div class="hint">Yönetici hesabını oluştururken veya Hesabım bölümünden aldığınız <b>kurtarma kodunu</b> girin. Kodunuz yoksa paketteki <b>SIFRE-KURTARMA.txt</b> dosyasındaki adımları izleyin. Kayıtlarınız (ürünler, cariler, belgeler) bu işlemde silinmez.</div>' +
+    fld('Kullanıcı adı', '<input name="fu" autocomplete="username" autocapitalize="none" required>') +
+    fld('Kurtarma kodu', '<input name="fc" autocomplete="off" autocapitalize="characters" placeholder="XXXX-XXXX-XXXX-XXXX" required>') +
+    '<div class="cols">' + fld('Yeni şifre', '<input name="np" type="password" autocomplete="new-password" required>') + fld('Yeni şifre (tekrar)', '<input name="np2" type="password" autocomplete="new-password" required>') + '</div>',
+    function(f){
+      (async function(){
+        var wait = lockUntil - Date.now();
+        if(wait > 0){ toast('Çok fazla hatalı deneme. ' + Math.ceil(wait / 1000) + ' saniye sonra tekrar deneyin.', 'err'); return; }
+        var rec = db.settings.recovery;
+        if(!rec){ toast('Bu cihazda kurtarma kodu oluşturulmamış. SIFRE-KURTARMA.txt dosyasındaki adımları izleyin.', 'err'); return; }
+        var un = f.fu.trim().toLowerCase(), u = db.users.find(function(x){ return x.username === un && x.active !== false; });
+        var okc = (await hashPw(recNorm(f.fc), rec.salt)) === rec.hash;
+        if(!u || !okc){ loginTries++; if(loginTries >= 5){ lockUntil = Date.now() + 30000; loginTries = 0; } toast('Kullanıcı adı veya kurtarma kodu hatalı', 'err'); return; }
+        if(f.np.length < 4){ toast('Yeni şifre en az 4 karakter olmalı', 'err'); return; }
+        if(f.np !== f.np2){ toast('Yeni şifreler aynı değil', 'err'); return; }
+        u.salt = newSalt(); u.hash = await hashPw(f.np, u.salt); loginTries = 0;
+        commit(); closeModal(); toast('Şifre değiştirildi. Yeni şifrenizle giriş yapabilirsiniz.');
+      })();
+      return false;
+    }, 'Şifreyi sıfırla');
+};
 A.logout = function(){ if(SRV){ srvLogout(); return; } setSess(''); state.ed = {sale:null, purchase:null}; state.cariId = null; state.tab = 'panel'; closeModal(); render(); };
 
 /* ---------- Giriş ve ilk kurulum ---------- */
@@ -3910,7 +3977,7 @@ var loginTries = 0, lockUntil = 0;
 function loginView(){
   return '<div class="card login">' + logoBlock() + '<h2>' + esc((db.settings && db.settings.name) || 'Stok ve Cari Takip') + '</h2><p class="muted" style="margin-top:4px">Devam etmek için giriş yapın.</p>' +
     '<form id="lf">' + fld('Kullanıcı adı', '<input name="u" autocomplete="username" autocapitalize="none" required>') + fld('Şifre', '<input name="p" type="password" autocomplete="current-password" required>') +
-    '<div class="err-t" id="lerr"></div><button class="btn pri" style="width:100%">Giriş yap</button></form><div class="muted" style="text-align:center;font-size:12px;margin-top:14px">Sürüm ' + esc(APP_VERSION) + '</div></div>';
+    '<div class="err-t" id="lerr"></div><button class="btn pri" style="width:100%">Giriş yap</button></form>' + (SRV ? '' : '<div style="text-align:center;margin-top:12px"><a href="#" data-act="forgot" style="font-size:13px">Şifremi unuttum</a></div>') + '<div class="muted" style="text-align:center;font-size:12px;margin-top:14px">Sürüm ' + esc(APP_VERSION) + '</div></div>';
 }
 function setupView(){
   return '<div class="card login">' + logoBlock() + '<h2>İlk kurulum</h2><p class="muted" style="margin-top:4px">' + (SRV ? 'Veritabanı boş. Yönetici hesabını oluşturun.' : 'Yönetici hesabını oluşturun. Mevcut kayıtlarınız varsa korunur.') + '</p>' +
@@ -3958,7 +4025,9 @@ async function doSetup(f){
   var u = {id:uid(), name:nm, username:un, role:'admin', active:true, salt:salt, hash:await hashPw(pw, salt), created:today()};
   db.users.push(u);
   if(E.biz.value.trim()) db.settings.name = E.biz.value.trim();
+  var rcode = await makeRecovery();
   setSess(u.id); commit(); toast('Kurulum tamamlandı');
+  showRecoveryCode(rcode);
 }
 
 /* ---------- Sunucu modu (SQL Server veritabanı) ---------- */
