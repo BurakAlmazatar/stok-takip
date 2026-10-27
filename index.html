@@ -238,7 +238,7 @@ label.f>input,label.f>select,label.f>textarea{margin-top:4px;font-weight:400}
 <script>
 /* ---------- Veri ---------- */
 var KEY = 'stokcari_v1';
-var APP_VERSION = '2026.10.25-10';
+var APP_VERSION = '2026.10.25-11';
 function defaults(){ return {products:[],caris:[],docs:[],payments:[],moves:[],counters:{sale:0,purchase:0},seq:1,users:[],campaigns:[],rates:[],settings:{name:'',phone:'',address:'',taxNo:'',footer:'',logo:'',logoRcpt:false,attrVals:[[],[],[],[],[]]}}; }
 function load(){
   try{ var s = localStorage.getItem(KEY); if(s){ var o = JSON.parse(s); return Object.assign(defaults(), o); } }catch(e){}
@@ -1484,14 +1484,7 @@ function saleCosts(){
   });
   return cost;
 }
-/* Ürünün en son alış ve satış belgesindeki net (indirimler düşülmüş, KDV dahil) birim fiyatı */
-function lastNetMap(){
-  var buy = {}, sell = {};
-  db.docs.filter(function(d){ return d.type === 'purchase' || d.type === 'sale'; }).sort(function(a, b){ return a.date.localeCompare(b.date) || (a.ts || 0) - (b.ts || 0); }).forEach(function(d){
-    d.lines.forEach(function(l){ var q = num(l.qty); if(!(q > 0)) return; var u = Math.round(lt(l) / q * 10000) / 10000; if(d.type === 'purchase') buy[l.pid] = u; else sell[l.pid] = u; });
-  });
-  return {buy:buy, sell:sell};
-}
+
 function stockTable(){
   if(!db.products.length) return '<div class="empty">Önce ürün kartı açın.</div>';
   var ps = db.products.filter(stockMatch).sort(function(a, b){ return a.name.localeCompare(b.name, 'tr'); });
@@ -1503,24 +1496,67 @@ function stockTable(){
       return '<tr><td>' + esc(p.name) + stockSub(p) + '</td><td class="r"><span class="tag ' + (s <= 0 ? 'bad' : (p.min > 0 && s <= p.min) ? 'warn' : 'move') + '">' + qf(s) + ' ' + esc(p.unit) + '</span></td>' + (can('cost') ? '<td class="r">' + money(s * ac[p.id]) + '<div class="muted" style="font-size:12px">ort. ' + money(ac[p.id]) + '</div></td>' : '') + '<td class="r">' + (can('stockmove') ? '<button class="btn sm" data-act="stockMove" data-dir="in" data-pid="' + p.id + '">Giriş</button> <button class="btn sm" data-act="stockMove" data-dir="out" data-pid="' + p.id + '">Çıkış</button>' : '') + '</td></tr>';
     }).join('') + '</tbody></table></div>';
 }
-function stockMoves(){
-  var on = stockFiltersOn();
-  var mv = db.moves.filter(function(m){ var p = prod(m.pid); return p ? stockMatch(p) : !on; }).sort(function(a, b){ return b.date.localeCompare(a.date) || b.ts - a.ts; });
-  var shown = mv.slice(0, 100);
-  if(!shown.length) return '<div class="empty">' + (on ? 'Aramanıza uyan hareket yok.' : 'Hareket yok.') + '</div>';
-  var ln = lastNetMap(), cst = can('cost'), nm = function(v){ return v == null ? '<span class="muted">—</span>' : money(v); };
-  return '<div class="tbl"><table><thead><tr><th>Tarih</th><th>Ürün</th><th>Neden</th><th class="r">Miktar</th>' + (cst ? '<th class="r" title="En son alış belgesindeki net birim fiyat (indirimler düşülmüş, KDV dahil)">Son net alış</th>' : '') + '<th class="r" title="En son satış belgesindeki net birim fiyat (indirimler düşülmüş, KDV dahil)">Son net satış</th><th></th></tr></thead><tbody>' + shown.map(function(m){
-    var p = prod(m.pid);
-    return '<tr><td class="nw">' + fd(m.date) + '</td><td>' + esc(p ? p.name : '(silinmiş ürün)') + (m.cl || m.sz ? ' <span class="tag move">' + esc(varLabel(m.cl, m.sz)) + '</span>' : '') + (p && (p.code || p.barcode) ? '<div class="muted" style="font-size:12px">' + [p.code, p.barcode].filter(Boolean).map(esc).join(' · ') + '</div>' : '') + '</td><td>' + esc(m.reason) + (m.no ? ' <span class="muted">' + esc(m.no) + '</span>' : '') + (m.note ? ' <span class="muted">· ' + esc(m.note) + '</span>' : '') + (m.by ? ' <span class="muted">· ' + esc(userName(m.by)) + '</span>' : '') + '</td><td class="r ' + (m.qty > 0 ? 'pos' : 'neg') + '">' + (m.qty > 0 ? '+' : '') + qf(m.qty) + '</td>' + (cst ? '<td class="r">' + nm(ln.buy[m.pid]) + '</td>' : '') + '<td class="r">' + nm(ln.sell[m.pid]) + '</td><td class="r">' + (m.ref || !can('stock.delete') ? '' : '<button class="btn sm danger" data-act="delMove" data-id="' + m.id + '">Sil</button>') + '</td></tr>';
-  }).join('') + '</tbody></table></div>' + (mv.length > shown.length ? '<div class="muted">İlk 100 hareket gösteriliyor, toplam ' + mv.length + ' hareket var. Aramayı daraltın.</div>' : '');
+/* Hareket başına net birim fiyat: hareketin ait olduğu belgedeki satır (indirimler düşülmüş, KDV dahil).
+   Alış ve alış iadesi belgelerinde net alış, satış ve satış iadesi belgelerinde net satış; diğeri 0. Elle giriş ve açılış stoğunda ikisi de 0. */
+function moveNets(){
+  var docs = {}, byKey = {}, out = {};
+  db.docs.forEach(function(d){ docs[d.id] = d; });
+  db.moves.forEach(function(m){
+    if(!m.ref) return;
+    var d = docs[m.ref]; if(!d) return;
+    var k = m.ref + '|' + m.pid + '|' + nv(m.cl) + '|' + nv(m.sz), b = byKey[k];
+    if(!b) b = byKey[k] = {i:0, lines:d.lines.filter(function(l){ return l.pid === m.pid && nv(l.cl) === nv(m.cl) && nv(l.sz) === nv(m.sz) && num(l.qty) > 0; })};
+    var l = b.lines[Math.min(b.i, b.lines.length - 1)]; b.i++;
+    if(!l) return;
+    out[m.id] = {k:(d.type === 'purchase' || d.type === 'pret') ? 'buy' : 'sell', u:Math.round(lt(l) / num(l.qty) * 10000) / 10000};
+  });
+  return out;
 }
+function mvMode(){ return state.sq.mv === 'var' ? 'var' : 'prod'; }
+function mvGroups(list, nets, detail){                           // detail: her hareket ayrı satır; değilse aynı ürünün hareketleri (renk/beden satırları) tek satırda toplanır
+  var groups = [], open = {};
+  list.forEach(function(m){
+    var g = null, gk = '';
+    if(!detail){
+      gk = (m.ref ? 'r' + m.ref : 'm' + [m.date, m.reason, m.note || '', m.by || ''].join('|')) + '|' + m.pid;
+      g = open[gk];
+      if(g && !m.ref && Math.abs(g.ts - m.ts) > 10000) g = null;       // elle girişte aynı kayıt sayılması için zaman penceresi
+    }
+    if(!g){
+      g = {moves:[], date:m.date, ts:m.ts, pid:m.pid, reason:m.reason, no:m.no, note:m.note, by:m.by, qty:0, ba:0, bq:0, sa:0, sq:0};
+      groups.push(g); if(!detail) open[gk] = g;
+    }
+    g.moves.push(m); g.qty = Math.round((g.qty + m.qty) * 1000) / 1000;
+    var n = nets[m.id]; if(n){ var w = Math.abs(m.qty); if(n.k === 'buy'){ g.ba += n.u * w; g.bq += w; } else { g.sa += n.u * w; g.sq += w; } }
+  });
+  return groups;
+}
+function stockMoves(){
+  var on = stockFiltersOn(), detail = mvMode() === 'var';
+  var mv = db.moves.filter(function(m){ var p = prod(m.pid); return p ? stockMatch(p) : !on; }).sort(function(a, b){ return b.date.localeCompare(a.date) || b.ts - a.ts; });
+  var rows = mvGroups(mv, moveNets(), detail), shown = rows.slice(0, 100);
+  if(!shown.length) return '<div class="empty">' + (on ? 'Aramanıza uyan hareket yok.' : 'Hareket yok.') + '</div>';
+  var cst = can('cost'), cd = can('stock.delete');
+  return '<div class="tbl"><table><thead><tr><th>Tarih</th><th>Ürün</th><th>Neden</th><th class="r">Miktar</th>' + (cst ? '<th class="r" title="Hareketin ait olduğu alış belgesindeki net birim fiyat (indirimler düşülmüş, KDV dahil). Alış hareketi değilse 0.">Net alış</th>' : '') + '<th class="r" title="Hareketin ait olduğu satış belgesindeki net birim fiyat (indirimler düşülmüş, KDV dahil). Satış hareketi değilse 0.">Net satış</th><th></th></tr></thead><tbody>' + shown.map(function(g){
+    var p = prod(g.pid), m0 = g.moves[0], one = g.moves.length === 1;
+    var vk = {}; g.moves.forEach(function(m){ if(m.cl || m.sz) vk[nv(m.cl) + '|' + nv(m.sz)] = 1; });
+    var nvar = Object.keys(vk).length;
+    var tag = one ? (m0.cl || m0.sz ? ' <span class="tag move">' + esc(varLabel(m0.cl, m0.sz)) + '</span>' : '') : '';
+    var cnt = one ? '' : '<div class="muted" style="font-size:12px">' + (nvar ? nvar + ' renk/beden' : g.moves.length + ' satır') + '</div>';
+    var canDel = cd && g.moves.every(function(m){ return !m.ref; });
+    var ids = g.moves.map(function(m){ return m.id; });
+    return '<tr><td class="nw">' + fd(g.date) + '</td><td>' + esc(p ? p.name : '(silinmiş ürün)') + tag + (p && (p.code || p.barcode) ? '<div class="muted" style="font-size:12px">' + [p.code, p.barcode].filter(Boolean).map(esc).join(' · ') + '</div>' : '') + cnt + '</td><td>' + esc(g.reason) + (g.no ? ' <span class="muted">' + esc(g.no) + '</span>' : '') + (g.note ? ' <span class="muted">· ' + esc(g.note) + '</span>' : '') + (g.by ? ' <span class="muted">· ' + esc(userName(g.by)) + '</span>' : '') + '</td><td class="r ' + (g.qty > 0 ? 'pos' : 'neg') + '">' + (g.qty > 0 ? '+' : '') + qf(g.qty) + '</td>' +
+      (cst ? '<td class="r">' + money(g.bq ? g.ba / g.bq : 0) + '</td>' : '') + '<td class="r">' + money(g.sq ? g.sa / g.sq : 0) + '</td><td class="r">' + (canDel ? '<button class="btn sm danger" data-act="delMove" ' + (ids.length === 1 ? 'data-id="' + ids[0] + '"' : 'data-ids="' + ids.join(',') + '"') + '>Sil</button>' : '') + '</td></tr>';
+  }).join('') + '</tbody></table></div>' + (rows.length > shown.length ? '<div class="muted">İlk 100 ' + (rows.length === mv.length ? 'hareket' : 'satır') + ' gösteriliyor, toplam ' + rows.length + ' ' + (rows.length === mv.length ? 'hareket' : 'satır') + ' var. Aramayı daraltın.</div>' : '');
+}
+
 function stRefresh(){ var a = $('#stlist'), b = $('#stmoves'); if(a) a.innerHTML = stockTable(); if(b) b.innerHTML = stockMoves(); }
 V.stock = function(){
   if(state.ed.stock) return stockEditorHTML(state.ed.stock);
   return '<div class="bar"><h2>Stok</h2><span class="spacer"></span>' + (can('stockmove') ? '<button class="btn" data-act="stockMove" data-dir="out">Stok çıkışı</button><button class="btn pri" data-act="stockMove" data-dir="in">Stok girişi</button>' : '') + '</div>' +
-  '<div class="legend">Satış ve alışlar stoğu otomatik günceller. Sayım farkı, fire, hasar gibi durumlar için elle giriş veya çıkış yapın (birden fazla ürünü tek seferde girebilirsiniz). Arama ve süzgeçler hem ürün listesini hem de stok hareketlerini daraltır.' + (can('cost') ? ' Stok değeri, alış belgelerindeki net birim maliyetlerin ağırlıklı ortalamasıyla hesaplanır (alış yoksa ürün kartındaki alış fiyatı). Son net alış ve satış, ürünün en son belgesindeki indirimler düşülmüş KDV dahil birim fiyatıdır.' : ' Son net satış, ürünün en son satış belgesindeki indirimler düşülmüş KDV dahil birim fiyatıdır.') + '</div>' +
+  '<div class="legend">Satış ve alışlar stoğu otomatik günceller. Sayım farkı, fire, hasar gibi durumlar için elle giriş veya çıkış yapın (birden fazla ürünü tek seferde girebilirsiniz). Arama ve süzgeçler hem ürün listesini hem de stok hareketlerini daraltır.' + (can('cost') ? ' Stok değeri, alış belgelerindeki net birim maliyetlerin ağırlıklı ortalamasıyla hesaplanır (alış yoksa ürün kartındaki alış fiyatı). Hareketlerdeki net alış/net satış, hareketin ait olduğu belgedeki indirimler düşülmüş KDV dahil birim fiyattır; alış hareketinde net satış, satış hareketinde net alış 0 yazar.' : ' Hareketlerdeki net satış, hareketin ait olduğu satış belgesindeki indirimler düşülmüş KDV dahil birim fiyattır.') + ' Stok hareketleri varsayılan olarak ürün bazında toplanır; renk/beden satırlarını ayrı görmek için “Renk / beden detayı”nı seçin.</div>' +
   stockFilters() + '<div id="stlist">' + stockTable() + '</div>' +
-  '<div class="bar" style="margin-top:6px"><h3 style="margin:0">Stok hareketleri</h3></div><div id="stmoves">' + stockMoves() + '</div>';
+  '<div class="bar" style="margin-top:6px"><h3 style="margin:0">Stok hareketleri</h3><span class="spacer"></span>' + (db.moves.some(function(m){ return m.cl || m.sz; }) ? '<div class="chips">' + [['prod', 'Ürün bazlı'], ['var', 'Renk / beden detayı']].map(function(t){ return '<button class="chip' + (mvMode() === t[0] ? ' on' : '') + '" data-act="mvView" data-v="' + t[0] + '">' + t[1] + '</button>'; }).join('') + '</div>' : '') + '</div><div id="stmoves">' + stockMoves() + '</div>';
 };
 
 var STK_REASONS = ['Sayım farkı', 'Fire / zayiat', 'Hasar', 'İade', 'Düzeltme', 'Diğer'];
@@ -2201,7 +2237,11 @@ A.delProduct = function(d){
     db.caris.forEach(function(c){ if(c.prices && c.prices[d.id] != null){ delete c.prices[d.id]; if(!Object.keys(c.prices).length) delete c.prices; } });
     db.products = db.products.filter(function(p){ return p.id !== d.id; }); db.moves = db.moves.filter(function(m){ return m.pid !== d.id; }); commit(); toast('Ürün silindi'); });
 };
-A.delMove = function(d){ confirmBox('Bu stok hareketi silinecek.', function(){ db.moves = db.moves.filter(function(m){ return m.id !== d.id; }); commit(); }); };
+A.mvView = function(d){ state.sq.mv = d.v === 'var' ? 'var' : 'prod'; render(); };
+A.delMove = function(d){
+  var ids = d.ids ? String(d.ids).split(',') : [d.id];
+  confirmBox(ids.length > 1 ? ids.length + ' stok hareketi silinecek.' : 'Bu stok hareketi silinecek.', function(){ db.moves = db.moves.filter(function(m){ return ids.indexOf(m.id) < 0; }); commit(); });
+};
 A.stockMove = function(d){
   if(!db.products.length){ toast('Önce ürün kartı açın', 'err'); return; }
   state.ed.stock = {dir:d.dir === 'out' ? 'out' : 'in', date:today(), reason:STK_REASONS[0], note:'', lines:[{pid:d.pid || '', qty:1, cl:'', sz:''}]};
