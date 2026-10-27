@@ -238,7 +238,7 @@ label.f>input,label.f>select,label.f>textarea{margin-top:4px;font-weight:400}
 <script>
 /* ---------- Veri ---------- */
 var KEY = 'stokcari_v1';
-var APP_VERSION = '2026.10.25-11';
+var APP_VERSION = '2026.10.25-12';
 function defaults(){ return {products:[],caris:[],docs:[],payments:[],moves:[],counters:{sale:0,purchase:0},seq:1,users:[],campaigns:[],rates:[],settings:{name:'',phone:'',address:'',taxNo:'',footer:'',logo:'',logoRcpt:false,attrVals:[[],[],[],[],[]]}}; }
 function load(){
   try{ var s = localStorage.getItem(KEY); if(s){ var o = JSON.parse(s); return Object.assign(defaults(), o); } }catch(e){}
@@ -270,14 +270,15 @@ var PERMS = [
   {id:'payrep', label:'Ödeme Raporu', items:[['view', 'Menüyü ve raporu görebilir']]},
   {id:'settings', label:'Ayarlar', items:[['view', 'Menüyü görebilir (tema)'], ['edit', 'Firma bilgilerini ve logoyu değiştirebilir']]},
   {id:'cost', label:'Maliyet bilgisi', items:[['view', 'Alış fiyatlarını ve stok değerini görebilir']]},
-  {id:'fx', label:'Döviz ve kurlar', items:[['use', 'Dövizli işlem yapabilir (belge ve ödeme)'], ['rate', 'Kuru elle yazabilir, kur kaydı ekleyebilir ve kurları güncelleyebilir']]}
+  {id:'fx', label:'Döviz ve kurlar', items:[['use', 'Dövizli işlem yapabilir (belge ve ödeme)'], ['rate', 'Kuru elle yazabilir, kur kaydı ekleyebilir ve kurları güncelleyebilir']]},
+  {id:'revise', label:'Kayıt düzenleme', items:[['docs', 'Kayıtlı satış ve alış belgelerini düzenleyebilir'], ['pays', 'Kayıtlı tahsilat ve ödeme makbuzlarını düzenleyebilir']]}
 ];
 var PERM_ALIAS = {cost:'cost.view', stockmove:'stock.move', payout:'payments.payout', collect:'payments.collect', addCari:'caris.add', sell:'sales.new', refund:'sales.refund', buy:'purchases.new'};
 var PERM_TPL = {
   kasiyer:['panel.view', 'sales.view', 'sales.new', 'sales.refund', 'products.view', 'stock.view', 'caris.view', 'caris.add', 'payments.view', 'payments.collect'],
   satis:['panel.view', 'sales.view', 'sales.new', 'sales.discount', 'sales.price', 'sales.refund', 'products.view', 'campaigns.view', 'stock.view', 'caris.view', 'caris.add', 'payments.view', 'payments.collect', 'fx.use'],
   depo:['panel.view', 'products.view', 'products.edit', 'products.import', 'products.labels', 'attrs.view', 'stock.view', 'stock.move', 'purchases.view', 'purchases.new', 'purchases.refund', 'cost.view'],
-  muhasebe:['panel.view', 'panel.cash', 'sales.view', 'purchases.view', 'caris.view', 'payments.view', 'payments.collect', 'payments.payout', 'reports.view', 'reports.profit', 'payrep.view', 'cost.view', 'fx.use', 'fx.rate']
+  muhasebe:['panel.view', 'panel.cash', 'sales.view', 'purchases.view', 'caris.view', 'payments.view', 'payments.collect', 'payments.payout', 'reports.view', 'reports.profit', 'payrep.view', 'cost.view', 'fx.use', 'fx.rate', 'revise.docs', 'revise.pays']
 };
 function allPerms(){ var a = []; PERMS.forEach(function(g){ g.items.forEach(function(it){ a.push(g.id + '.' + it[0]); }); }); return a; }
 function legacyStaffPerms(){
@@ -315,7 +316,7 @@ var ACT_PERM = {
   newCari:'caris.add', quickCari:'caris.add', editCari:'caris.edit', delCari:'caris.delete',
   delPay:'payments.delete',
   repPreset:'reports.view', repType:'reports.view', copyRep:'reports.view', repMethod:'payrep.view', copyPay:'payrep.view',
-  newCamp:'campaigns.edit', editCamp:'campaigns.edit', campPick:'campaigns.edit', cariPrices:'caris.edit', cpClear:'caris.edit', fxAuto:'fx.use', fxUpdate:'fx.rate', fxAdd:'fx.rate', fxDel:'fx.rate', fxRules:'settings.edit', fxRulesReset:'settings.edit', addCat:'attrs.edit', editCat:'attrs.edit', delCat:'attrs.edit', moveCat:'attrs.edit', catQuick:'attrs.edit', togCamp:'campaigns.edit', delCamp:'campaigns.edit',
+  newCamp:'campaigns.edit', editCamp:'campaigns.edit', campPick:'campaigns.edit', cariPrices:'caris.edit', cpClear:'caris.edit', editDoc:'revise.docs', editPay:'revise.pays', lockSave:'admin', lockClear:'admin', fxAuto:'fx.use', fxUpdate:'fx.rate', fxAdd:'fx.rate', fxDel:'fx.rate', fxRules:'settings.edit', fxRulesReset:'settings.edit', addCat:'attrs.edit', editCat:'attrs.edit', delCat:'attrs.edit', moveCat:'attrs.edit', catQuick:'attrs.edit', togCamp:'campaigns.edit', delCamp:'campaigns.edit',
   saveAttrs:'attrs.edit', addVal:'attrs.edit', editVal:'attrs.edit', delVal:'attrs.edit',
   saveName:'settings.edit', rmLogo:'settings.edit', saveRc:'settings.edit', saveLbl:'settings.edit', saveEan:'settings.edit', eanReset:'settings.edit', lblReset:'settings.edit', lblTest:'settings.edit', rcReset:'settings.edit', saveMenus:'settings.edit', menusReset:'settings.edit',
   exportData:'admin', importData:'admin', downloadBackup:'admin', demo:'admin', wipe:'admin', newUser:'admin', editUser:'admin', delUser:'admin', permTpl:'admin'
@@ -824,11 +825,12 @@ function priceLines(type, date, raw, cariId){
   return raw.map(function(l, i){
     var p = prod(l.pid), qty = num(l.qty), price = num(l.price);
     if(!p || qty <= 0) return {gross:0, cDisc:0, camp:'', mDisc:0, net:0, avail:null, applied:false};
-    var gross = r2(qty * price), cDisc = Math.min(gross, plan[i].amt), base = r2(gross - cDisc);
+    var fc = (l.fc && !l.noCamp) ? r2(l.fc.amt * qty / (l.fc.q || qty)) : null;           // düzenleme: kayıtlı kampanya indirimi korunur
+    var gross = r2(qty * price), cDisc = Math.min(gross, fc != null ? fc : plan[i].amt), base = r2(gross - cDisc);
     var d = l.disc || {t:'%', v:''}, v = Math.max(0, num(d.v));
     var mDisc = v ? (d.t === '₺' ? Math.min(base, r2(v)) : r2(base * Math.min(100, v) / 100)) : 0;
     var ac = (type === 'sale' && l.noCamp) ? anyCamp(p, date, cariId) : null;
-    return {gross:gross, cDisc:cDisc, camp:cDisc > 0 ? plan[i].name : '', mDisc:mDisc, net:r2(base - mDisc), avail:ac ? {name:ac.name} : null, applied:cDisc > 0};
+    return {gross:gross, cDisc:cDisc, camp:cDisc > 0 ? (fc != null ? l.fc.name : plan[i].name) : '', mDisc:mDisc, net:r2(base - mDisc), avail:ac ? {name:ac.name} : null, applied:cDisc > 0};
   });
 }
 function priceDoc(type, date, rawLines, dd, cariId){
@@ -851,14 +853,24 @@ function priceDoc(type, date, rawLines, dd, cariId){
 }
 
 /* ---------- Belge oluşturma ---------- */
+function refreshCosts(pids){                                   // ürünün alış fiyatı = en son alış belgesindeki birim maliyet
+  pids.forEach(function(pid){
+    var p = prod(pid); if(!p) return;
+    var ds = db.docs.filter(function(d){ return d.type === 'purchase' && d.lines.some(function(l){ return l.pid === pid; }); }).sort(function(a, b){ return b.date.localeCompare(a.date) || b.ts - a.ts; });
+    if(!ds.length) return;
+    var ls = ds[0].lines.filter(function(l){ return l.pid === pid; }), ln = ls[ls.length - 1];
+    if(ln && ln.cost > 0) p.cost = ln.cost;
+  });
+}
 function createDoc(o){
-  var T = TYPES[o.type];
+  var T = TYPES[o.type], base = o.edit || null;
   var no = o.no;
   if(!no){ db.counters[o.type] = (db.counters[o.type] || 0) + 1; no = T.pre + '-' + String(db.counters[o.type]).padStart(4, '0'); }
   var pr = priceDoc(o.type, o.date, o.lines, o.docDisc, o.cariId);
   var lines = pr.lines.map(function(l){
     var p = prod(l.pid);
     l.cost = T.sellSide ? ((p && p.cost) || 0) : (l.qty ? Math.round(l.net / l.qty * 10000) / 10000 : 0);
+    if(base && T.sellSide){ var ol0 = base.lines.find(function(x){ return x.pid === l.pid && nv(x.cl) === nv(l.cl) && nv(x.sz) === nv(l.sz); }); if(ol0 && ol0.cost != null) l.cost = ol0.cost; }      // düzenlemede satış anındaki maliyet korunur
     return l;
   });
   var total = pr.total;
@@ -872,18 +884,26 @@ function createDoc(o){
     if(ol){ if(ol.vat != null) l.vat = ol.vat; if(T.sellSide && ol.cost != null) l.cost = ol.cost; }
   });
   if(o.cur){ var raws = (o.lines || []).filter(function(x){ return x.pid && num(x.qty) > 0; }); lines.forEach(function(l, i){ if(raws[i] && raws[i].pf !== undefined && raws[i].pf !== '') l.pf = r2(num(raws[i].pf)); }); }
-  var doc = {id:uid(), no:no, type:o.type, date:o.date, cariId:o.cariId || '', lines:lines, total:total, gross:pr.gross, docDisc:pr.docDisc, paid:paid, pays:pays, note:o.note || '', ref:od ? od.id : '', refNo:od ? od.no : '', by:(cur() || {}).id || '', ts:Date.now() + db.seq};
+  var doc = {id:base ? base.id : uid(), no:no, type:o.type, date:o.date, cariId:o.cariId || '', lines:lines, total:total, gross:pr.gross, docDisc:pr.docDisc, paid:paid, pays:pays, note:o.note || '', ref:od ? od.id : '', refNo:od ? od.no : '', by:base ? base.by : ((cur() || {}).id || ''), ts:base ? base.ts : Date.now() + db.seq};
+  if(o.rev) doc.rev = o.rev;
   if(o.cur){ doc.cur = o.cur; doc.ftotal = o.ftotal; }
   if(o.fxr) doc.fxr = o.fxr;
   if(o.tnd) doc.tnd = o.tnd;
   if(o.chg) doc.chg = o.chg;
-  db.docs.push(doc);
+  var oldPids = [];
+  if(base){                                                    // düzenleme: belge yerinde yenilenir, eski stok hareketleri silinip yenileri yazılır
+    var ix = db.docs.findIndex(function(x){ return x.id === base.id; });
+    if(ix >= 0) db.docs[ix] = doc; else db.docs.push(doc);
+    oldPids = base.lines.map(function(l){ return l.pid; });
+    db.moves = db.moves.filter(function(m){ return m.ref !== base.id; });
+  } else db.docs.push(doc);
   lines.forEach(function(l){
     var mv0 = {id:uid(), pid:l.pid, qty:T.stock * l.qty, date:o.date, reason:KIND[o.type], ref:doc.id, no:no, ts:doc.ts};
     if(l.cl) mv0.cl = l.cl; if(l.sz) mv0.sz = l.sz;
     db.moves.push(mv0);
-    if(o.type === 'purchase' && l.cost > 0){ var p = prod(l.pid); if(p) p.cost = l.cost; }
+    if(!base && o.type === 'purchase' && l.cost > 0){ var p = prod(l.pid); if(p) p.cost = l.cost; }
   });
+  if(base && o.type === 'purchase') refreshCosts(oldPids.concat(lines.map(function(l){ return l.pid; })));
   return doc;
 }
 
@@ -895,7 +915,7 @@ function docRows(docs){
   return '<div class="tbl"><table><thead><tr><th>Tarih</th><th>Tür</th><th>No</th><th>Cari</th><th class="r">Tutar</th><th class="r">Ödenen</th><th class="r">Kalan</th></tr></thead><tbody>' +
     docs.map(function(d){
       var rest = r2(d.total - d.paid);
-      return '<tr data-act="openDoc" data-id="' + d.id + '"><td class="nw">' + fd(d.date) + '</td><td>' + tag(d.type) + '</td><td class="nw">' + esc(d.no) + (d.refNo ? '<div class="muted" style="font-size:12px">↩ ' + esc(d.refNo) + '</div>' : '') + '</td><td>' + esc(cariName(d.cariId)) + '</td><td class="r">' + money(d.total) + (d.cur ? '<div class="muted" style="font-size:12px">' + fm(d.ftotal, d.cur) + '</div>' : '') + '</td><td class="r">' + money(d.paid) + '</td><td class="r">' + (rest > 0.004 ? '<span class="neg">' + money(rest) + '</span>' : '<span class="muted">—</span>') + '</td></tr>';
+      return '<tr data-act="openDoc" data-id="' + d.id + '"><td class="nw">' + fd(d.date) + '</td><td>' + tag(d.type) + '</td><td class="nw">' + esc(d.no) + (d.rev && d.rev.length ? ' <span class="tag move" style="font-size:11px">Düzenlendi</span>' : '') + (d.refNo ? '<div class="muted" style="font-size:12px">↩ ' + esc(d.refNo) + '</div>' : '') + '</td><td>' + esc(cariName(d.cariId)) + '</td><td class="r">' + money(d.total) + (d.cur ? '<div class="muted" style="font-size:12px">' + fm(d.ftotal, d.cur) + '</div>' : '') + '</td><td class="r">' + money(d.paid) + '</td><td class="r">' + (rest > 0.004 ? '<span class="neg">' + money(rest) + '</span>' : '<span class="muted">—</span>') + '</td></tr>';
     }).join('') + '</tbody></table></div>';
 }
 function sortedDocs(types){
@@ -1098,6 +1118,83 @@ function priceInput(type, ed, i, l, priceOk){
   if(ed.cur !== 'TRY' && !ed.ref) return '<input class="pc" type="number" inputmode="decimal" step="any" min="0" id="pr' + i + '" placeholder="Fiyat (' + FX_SYM[ed.cur] + ', KDV dahil)" value="' + esc(l.pf) + '"' + (priceOk ? '' : ' readonly') + ' data-ed="' + type + '" data-i="' + i + '" data-f="pf" aria-label="Birim fiyat">';
   return '<input class="pc" type="number" inputmode="decimal" step="any" min="0" id="pr' + i + '" placeholder="Fiyat (KDV dahil)" value="' + esc(l.price) + '"' + (priceOk ? '' : ' readonly') + ' data-ed="' + type + '" data-i="' + i + '" data-f="price" aria-label="Birim fiyat">';
 }
+/* ---------- Kapanış kilidi ve değişiklik geçmişi ---------- */
+function lockDate(){ var d = db.settings && db.settings.lockDate; return /^\d{4}-\d{2}-\d{2}$/.test(d || '') ? d : ''; }
+function isLocked(date){ var l = lockDate(); return !!(l && date && String(date).slice(0, 10) <= l); }
+function lockGuard(){                                          // verilen tarihlerden biri kilitliyse uyarır ve true döner
+  for(var i = 0; i < arguments.length; i++){ if(isLocked(arguments[i])){ toast('Kapanış tarihi (' + fd(lockDate()) + ') ve öncesindeki tarihler için işlem yapılamaz', 'err'); return true; } }
+  return false;
+}
+function revDay(rev){ var l = rev && rev.length ? rev[rev.length - 1] : null; return l ? ymd(new Date(l.ts)) : ''; }
+function revHTML(rev){
+  if(!rev || !rev.length) return '';
+  return '<details class="cpdet"><summary>Değişiklik geçmişi (' + rev.length + ')</summary>' + rev.slice().reverse().map(function(r){
+    var d = new Date(r.ts), hm = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+    return '<div style="font-size:13px;margin:6px 0"><b>' + fd(ymd(d)) + ' ' + hm + '</b> · ' + esc(userName(r.by)) + '<div class="muted">' + (r.s || []).map(esc).join('<br>') + '</div></div>';
+  }).join('') + '</details>';
+}
+function pnm(l){ var p = prod(l.pid); return (p ? p.name : '(silinmiş)') + (l.cl || l.sz ? ' (' + varLabel(l.cl, l.sz) + ')' : ''); }
+function revDiff(old, nw){                                     // eski belge ile yeni hâl arasındaki farkın kısa özeti
+  var out = [];
+  if(old.date !== nw.date) out.push('Tarih: ' + fd(old.date) + ' → ' + fd(nw.date));
+  if((old.cariId || '') !== (nw.cariId || '')) out.push('Cari: ' + cariName(old.cariId) + ' → ' + cariName(nw.cariId));
+  if((old.note || '') !== (nw.note || '')) out.push('Not değişti');
+  var pt = function(p){ var k = Object.keys(p || {}).filter(function(m){ return p[m] > 0; }); return k.length ? k.map(function(m){ return m + ' ' + money(p[m]); }).join(' + ') : 'ödeme yok'; };
+  if(pt(docPays(old)) !== pt(nw.pays)) out.push('Ödeme: ' + pt(docPays(old)) + ' → ' + pt(nw.pays));
+  var key = function(l){ return l.pid + '|' + nv(l.cl) + '|' + nv(l.sz); }, om = {}, nm = {}, keys = [];
+  old.lines.forEach(function(l){ var k = key(l); if(!om[k] && !nm[k]) keys.push(k); (om[k] = om[k] || []).push(l); });
+  nw.lines.forEach(function(l){ var k = key(l); if(!om[k] && !nm[k]) keys.push(k); (nm[k] = nm[k] || []).push(l); });
+  keys.forEach(function(k){
+    var ol = om[k] || [], nl = nm[k] || [];
+    if(!ol.length){ out.push('+ ' + pnm(nl[0]) + ' × ' + qf(sum(nl, function(x){ return x.qty; }))); return; }
+    if(!nl.length){ out.push('− ' + pnm(ol[0]) + ' çıkarıldı'); return; }
+    var oq = sum(ol, function(x){ return x.qty; }), nq = sum(nl, function(x){ return x.qty; });
+    var opx = r2(sum(ol, function(x){ return x.qty * x.price; }) / (oq || 1)), npx = r2(sum(nl, function(x){ return x.qty * x.price; }) / (nq || 1));
+    var on = sum(ol, function(x){ return lt(x); }), nn = sum(nl, function(x){ return lt(x); }), ch = [];
+    if(Math.abs(oq - nq) > 0.0001) ch.push('miktar ' + qf(oq) + ' → ' + qf(nq));
+    if(Math.abs(opx - npx) > 0.004) ch.push('fiyat ' + money(opx) + ' → ' + money(npx));
+    if(!ch.length && Math.abs(on - nn) > 0.004) ch.push('tutar ' + money(on) + ' → ' + money(nn));
+    if(ch.length) out.push(pnm(ol[0]) + ': ' + ch.join(', '));
+  });
+  if(Math.abs(old.total - nw.total) > 0.004) out.push('Toplam: ' + money(old.total) + ' → ' + money(nw.total));
+  if((old.cur || '') !== (nw.cur || '')) out.push('Para birimi: ' + (old.cur || 'TL') + ' → ' + (nw.cur || 'TL'));
+  FX_CURS.forEach(function(c){ var a = old.fxr && old.fxr[c] ? old.fxr[c].r : 0, b = nw.fxr && nw.fxr[c] ? nw.fxr[c].r : 0; if(a && b && Math.abs(a - b) > 0.00005) out.push('Kur ' + c + ': ' + rateFmt(a) + ' → ' + rateFmt(b)); });
+  if(out.length > 7) out = out.slice(0, 6).concat(['… ve ' + (out.length - 6) + ' değişiklik daha']);
+  return out.map(function(x){ return x.slice(0, 110); });
+}
+function payDiff(old, np){
+  var out = [], amt = function(p){ return p.cur ? fm(p.famt, p.cur) : money(p.amount); };
+  if(old.date !== np.date) out.push('Tarih: ' + fd(old.date) + ' → ' + fd(np.date));
+  if((old.cariId || '') !== (np.cariId || '')) out.push('Cari: ' + payWho(old.cariId) + ' → ' + payWho(np.cariId));
+  if(amt(old) !== amt(np)) out.push('Tutar: ' + amt(old) + ' → ' + amt(np));
+  if(old.method !== np.method) out.push('Yöntem: ' + old.method + ' → ' + np.method);
+  if(old.cariId && np.cariId && payAcc(old) !== payAcc(np)) out.push('Hesap: ' + payAcc(old) + ' → ' + payAcc(np));
+  if((old.note || '') !== (np.note || '')) out.push('Not değişti');
+  return out.map(function(x){ return x.slice(0, 110); });
+}
+function docToEd(x){
+  var KM = {'Nakit':'n', 'Kredi kartı':'k', 'Havale / EFT':'h'}, fx = x.fxr || {};
+  var ed = newEd(x.type, {cariId:x.cariId || '', date:x.date, note:x.note || '', editId:x.id, editNo:x.no, ref:x.ref || '', pm:null,
+    lines:x.lines.map(function(l){
+      var r = {pid:l.pid, qty:l.qty, price:String(l.price), pm:true};
+      if(l.cl) r.cl = l.cl; if(l.sz) r.sz = l.sz;
+      if(l.md && num(l.md.v) > 0) r.disc = {t:l.md.t, v:String(l.md.v)};
+      if(l.cDisc > 0) r.fc = {amt:l.cDisc, q:l.qty, name:l.camp || ''}; else if(x.type === 'sale') r.noCamp = true;
+      if(l.pf != null) r.pf = String(l.pf);
+      return r;
+    })});
+  if(x.docDisc && num(x.docDisc.v) > 0) ed.docDisc = {t:x.docDisc.t, v:String(x.docDisc.v)};
+  ed.cur = x.cur || 'TRY';
+  Object.keys(fx).forEach(function(c){ ed.rate[c] = String(fx[c].r); if(fx[c].t === 'man' || !fxAuto()) ed.rman[c] = true; else ed.rt = fx[c].t; });
+  if(x.tnd && x.tnd.length){ x.tnd.forEach(function(t){ var k = KM[t.m]; if(k){ ed.pay[k] = String(t.a); ed.pc[k] = t.c; } }); ed.chc = x.chg ? x.chg.c : ''; }
+  else {
+    var pp = docPays(x); Object.keys(pp).forEach(function(m){ var k = KM[m]; if(k) ed.pay[k] = String(pp[m]); });
+    var pks = Object.keys(pp).filter(function(m){ return KM[m]; });
+    if(pks.length === 1 && Math.abs(x.paid - x.total) <= 0.011) ed.pm = KM[pks[0]];          // tek yöntemle tamamen ödenmiş belge: toplam değişince ödeme de toplama uyar
+  }
+  return ed;
+}
+function canEditDoc(x){ return can('revise.docs') && can(DOC_PERM[x.type]) && can(DOC_VIEW[x.type]) && !isLocked(x.date) && (!(x.cur || x.fxr || x.tnd) || fxOn()); }
 function lineInfo(type, ed, i){
   var l = ed.lines[i], p = prod(l.pid);
   if(!p) return '';
@@ -1107,9 +1204,13 @@ function lineInfo(type, ed, i){
     if(miss) return '<span class="neg">Önce ' + miss + ' seçin</span> <span class="muted">· Toplam stok: ' + qf(stockOf(p.id)) + ' ' + esc(p.unit) + '</span>';
   }
   var st = hv ? stockV(p.id, l.cl, l.sz) : stockOf(p.id), sfx = hv ? ' (' + esc(vl) + ')' : '';
+  if(ed.editId){                                                // düzenleme: belgenin kendi stok hareketleri hariç (geri alınmış sayılır)
+    st = r2(st - sum(db.moves.filter(function(m){ return m.ref === ed.editId && m.pid === l.pid && nv(m.cl) === nv(l.cl) && nv(m.sz) === nv(l.sz); }), function(m){ return m.qty; }));
+    sfx += ' · belge hariç';
+  }
   var same = function(x){ return vkey(x) === vkey(l); };
   if(ed.ref && (type === 'sret' || type === 'pret')){
-    var rem = remainingQty(ed.ref, l.pid, l.cl, l.sz), need0 = sum(ed.lines.filter(same), function(x){ return num(x.qty); });
+    var rem = remainingQty(ed.ref, l.pid, l.cl, l.sz, ed.editId), need0 = sum(ed.lines.filter(same), function(x){ return num(x.qty); });
     if(need0 > rem + 0.0001) return '<span class="neg">İade edilebilir en fazla ' + qf(rem) + ' ' + esc(p.unit) + sfx + '</span>';
     return '<span class="muted">İade edilebilir: ' + qf(rem) + ' ' + esc(p.unit) + sfx + ' (bağlı belgeden)</span>';
   }
@@ -1152,8 +1253,8 @@ function editorHTML(type, ed){
   var refUI = '';
   if(ret){
     var rd = ed.ref ? origDoc(ed.ref) : null;
-    if(rd) refUI = '<div class="hint">Bağlı belge: <b>' + esc(rd.no) + '</b> · ' + fd(rd.date) + ' · ' + esc(cariName(rd.cariId)) + ' · ' + money(rd.total) + ' <button type="button" class="btn sm" data-act="refClear" data-type="' + type + '">Bağlantıyı kaldır</button><div class="muted" style="margin-top:4px">Yalnızca bu belgedeki ürünler, kalan iade edilebilir miktar kadar iade edilebilir. Fiyatlar belgedeki ödenen birim fiyattır. İade tutarı, belgede ödenen tutarın iade edilen paya düşen kısmı kadar belgedeki ödeme yöntemleriyle otomatik doldurulur, değiştirebilirsiniz.</div></div>';
-    else refUI = '<div class="card" style="padding:12px">' + fld('Bağlı ' + (type === 'sret' ? 'satış' : 'alış') + ' (isteğe bağlı)', '<input list="refdl" data-ed="' + type + '" data-f="refq" placeholder="Belge no yazın veya listeden seçin" autocomplete="off"><datalist id="refdl">' + refOptions(type) + '</datalist>') + '<div class="muted" style="margin-top:-4px;font-size:12px">Seçerseniz ürünler, fiyatlar ve cari belgeden gelir, iade edilebilir miktar kontrol edilir. Boş bırakırsanız bağlantısız iade olur.</div></div>';
+    if(rd) refUI = '<div class="hint">Bağlı belge: <b>' + esc(rd.no) + '</b> · ' + fd(rd.date) + ' · ' + esc(cariName(rd.cariId)) + ' · ' + money(rd.total) + (ed.editId ? '' : ' <button type="button" class="btn sm" data-act="refClear" data-type="' + type + '">Bağlantıyı kaldır</button>') + '<div class="muted" style="margin-top:4px">Yalnızca bu belgedeki ürünler, kalan iade edilebilir miktar kadar iade edilebilir. Fiyatlar belgedeki ödenen birim fiyattır. İade tutarı, belgede ödenen tutarın iade edilen paya düşen kısmı kadar belgedeki ödeme yöntemleriyle otomatik doldurulur, değiştirebilirsiniz.</div></div>';
+    else if(!ed.editId) refUI = '<div class="card" style="padding:12px">' + fld('Bağlı ' + (type === 'sret' ? 'satış' : 'alış') + ' (isteğe bağlı)', '<input list="refdl" data-ed="' + type + '" data-f="refq" placeholder="Belge no yazın veya listeden seçin" autocomplete="off"><datalist id="refdl">' + refOptions(type) + '</datalist>') + '<div class="muted" style="margin-top:-4px;font-size:12px">Seçerseniz ürünler, fiyatlar ve cari belgeden gelir, iade edilebilir miktar kontrol edilir. Boş bırakırsanız bağlantısız iade olur.</div></div>';
   }
   var dd = ed.docDisc || {t:'%', v:''};
   var hint = type === 'sret' ? 'Müşteriden geri alınan ürünler stoğa girer ve carinin bakiyesinden düşer. Müşteriye para iade ettiyseniz aşağıya yazın, iade etmediyseniz “Para iadesi yok” deyin.'
@@ -1165,7 +1266,7 @@ function editorHTML(type, ed){
     var sel = (fxOn() && !ed.ref) ? '<select class="pcs" data-ed="' + type + '" data-f="pcur_' + k + '" aria-label="Para birimi">' + curOpts(ed.pc[k] || 'TRY') + '</select>' : '';
     return fld(label, '<div class="payrow"><input type="number" inputmode="decimal" step="any" min="0" id="p_' + k + '" value="' + esc(ed.pay[k]) + '" data-ed="' + type + '" data-f="pay_' + k + '">' + sel + '</div><div class="muted pq" id="pq_' + k + '">' + esc(pqText(ed, k)) + '</div>');
   };
-  return '<div class="bar"><h2>' + ED_TITLE[type] + '</h2><span class="spacer"></span>' + sw + '</div>' + (hint ? '<div class="hint">' + hint + '</div>' : '') + refUI +
+  return '<div class="bar"><h2>' + (ed.editId ? 'Belge düzenle · ' + esc(ed.editNo) : ED_TITLE[type]) + '</h2><span class="spacer"></span>' + (ed.editId ? '' : sw) + '</div>' + (ed.editId ? '<div class="hint"><b>' + KIND[type] + ' ' + esc(ed.editNo) + '</b> düzenleniyor. Belge numarası değişmez; stok hareketleri, cari bakiye ve raporlar yeniden hesaplanır. Kayıtlı fiyatlar ve indirimler korunur. Yapılan değişiklik, belgenin “Değişiklik geçmişi”nde özetlenir.</div>' : (hint ? '<div class="hint">' + hint + '</div>' : '')) + refUI +
   '<div class="card">' +
     '<div class="cols">' +
       fld('Cari', '<div style="display:flex;gap:6px"><select data-ed="' + type + '" data-f="cariId"><option value="">' + (T.sellSide ? 'Perakende (cari yok)' : 'Cari seçin') + '</option>' + cs.map(function(c){ return '<option value="' + c.id + '"' + (ed.cariId === c.id ? ' selected' : '') + '>' + esc(c.name) + '</option>'; }).join('') + '</select>' + (can('addCari') ? '<button type="button" class="btn" data-act="quickCari" data-type="' + type + '" title="Yeni cari">+</button>' : '') + '</div>') +
@@ -1199,7 +1300,7 @@ function editorHTML(type, ed){
     '<div id="chgbox">' + chgHTML(type, ed, pcalc) + '</div>' +
     '<div class="wn" id="payw">' + (pcalc.err ? '<span class="neg">' + esc(pcalc.err) + '</span>' : '') + '</div>' +
     '<div style="margin-top:12px">' + fld('Not', '<input type="text" value="' + esc(ed.note) + '" data-ed="' + type + '" data-f="note" placeholder="İsteğe bağlı">') + '</div>' +
-    '<div class="row-end"><button class="btn" data-act="cancelDoc" data-type="' + type + '">Vazgeç</button><button class="btn pri" data-act="saveDoc" data-type="' + type + '">' + ED_SAVE[type] + '</button></div>' +
+    '<div class="row-end"><button class="btn" data-act="cancelDoc" data-type="' + type + '">Vazgeç</button><button class="btn pri" data-act="saveDoc" data-type="' + type + '">' + (ed.editId ? 'Değişiklikleri kaydet' : ED_SAVE[type]) + '</button></div>' +
   '</div>';
 }
 function updateTotals(type){
@@ -1718,7 +1819,7 @@ V.payments = function(){
     (list.length ? '<div class="tbl"><table><thead><tr><th>Tarih</th><th>Tür</th><th>Cari</th><th>Yöntem</th><th>Not</th><th class="r">Tutar</th><th></th></tr></thead><tbody>' + list.map(function(p){
       var amt = p.cur ? esc(fm(p.famt, p.cur)) + '<div class="muted" style="font-size:12px">≈ ' + esc(money(p.amount)) + '</div>' : money(p.amount);
       var acc = p.cariId && payAcc(p) !== (p.cur || 'TRY') ? '<div class="muted" style="font-size:12px">Hesaba: ' + esc(fm(payAccAmt(p), payAcc(p))) + '</div>' : '';
-      return '<tr><td class="nw">' + fd(p.date) + '</td><td>' + tag(p.dir) + '</td><td>' + esc(payWho(p.cariId)) + '</td><td>' + esc(p.method) + '</td><td class="muted">' + esc(p.note || '') + '</td><td class="r">' + amt + acc + '</td><td class="r"><button class="btn sm" data-act="receipt" data-kind="pay" data-id="' + p.id + '">Makbuz</button> ' + (can('payments.delete') ? '<button class="btn sm danger" data-act="delPay" data-id="' + p.id + '">Sil</button>' : '') + '</td></tr>';
+      return '<tr><td class="nw">' + fd(p.date) + '</td><td>' + tag(p.dir) + (p.rev && p.rev.length ? ' <span class="tag move" style="font-size:11px" title="' + esc((p.rev[p.rev.length - 1].s || []).join(' · ')) + '">Düzenlendi</span>' : '') + '</td><td>' + esc(payWho(p.cariId)) + '</td><td>' + esc(p.method) + '</td><td class="muted">' + esc(p.note || '') + '</td><td class="r">' + amt + acc + '</td><td class="r">' + (canEditPay(p) ? '<button class="btn sm" data-act="editPay" data-id="' + p.id + '">Düzenle</button> ' : '') + '<button class="btn sm" data-act="receipt" data-kind="pay" data-id="' + p.id + '">Makbuz</button> ' + (can('payments.delete') ? '<button class="btn sm danger" data-act="delPay" data-id="' + p.id + '">Sil</button>' : '') + '</td></tr>';
     }).join('') + '</tbody></table></div>' : '<div class="empty">Kayıt yok.</div>');
 };
 function payWho(id){ return id ? cariName(id) : 'Cari yok'; }
@@ -1728,7 +1829,7 @@ function pfVals(){
   var f = $('#mf'); if(!f) return null; var e = f.elements;
   return {amount:e.amount ? e.amount.value : '', cur:(e.cur && e.cur.value) || 'TRY', date:(e.date && e.date.value) || today(), cariId:e.cariId ? e.cariId.value : '', acc:e.acc ? e.acc.value : ''};
 }
-function pfAcc(v){ if(!v.cariId) return 'TRY'; return (PF && PF.accMan && v.acc) ? v.acc : (v.cur || 'TRY'); }
+function pfAcc(v){ if(!v.cariId) return 'TRY'; if(PF && PF.accMan) return v.acc || PF.accInit || v.cur || 'TRY'; return v.cur || 'TRY'; }
 function pfNeed(v){ var need = [], acc = pfAcc(v); if(v.cur !== 'TRY') need.push(v.cur); if(acc !== 'TRY' && acc !== v.cur) need.push(acc); return need; }
 function pfFill(v){
   FX_CURS.forEach(function(c){
@@ -1785,12 +1886,17 @@ function pfOnInput(t){
   if(n === 'rt'){ PF.rt = t.value; PF.rman = {}; }
   pfRender();
 }
-function payForm(dir, cid){
+function canEditPay(p){ return can('revise.pays') && can(p.dir === 'in' ? 'collect' : 'payout') && !isLocked(p.date) && (!(p.cur || p.acc) || fxOn()); }
+function payForm(dir, cid, editP){
   var cs = db.caris.slice().sort(function(a, b){ return a.name.localeCompare(b.name, 'tr'); });
   var isIn = dir === 'in', fx = fxOn();
-  PF = {dir:dir, rt:fxRule(isIn ? 'collect' : 'payout'), rate:{}, rman:{}, accMan:false};
-  modal(isIn ? 'Tahsilat al' : 'Ödeme yap',
-    (cid ? '<div class="hint">' + esc(cariName(cid)) + ': ' + balsHTML(cid) + '</div>' : '') +
+  PF = {dir:dir, rt:fxRule(isIn ? 'collect' : 'payout'), rate:{}, rman:{}, accMan:false, accInit:''};
+  if(editP){                                                   // düzenleme: kayıtlı kurlar ve hesap para birimi korunur
+    PF.accMan = !!editP.cariId; PF.accInit = editP.acc || 'TRY';
+    Object.keys(editP.fxr || {}).forEach(function(c){ var e0 = editP.fxr[c]; PF.rate[c] = String(e0.r); if(e0.t === 'man' || !fxAuto()) PF.rman[c] = true; else PF.rt = e0.t; });
+  }
+  modal(editP ? (isIn ? 'Tahsilatı düzenle' : 'Ödemeyi düzenle') : (isIn ? 'Tahsilat al' : 'Ödeme yap'),
+    (editP ? '<div class="hint">Kayıtlı makbuz düzenleniyor. Değişiklik, makbuzun “Düzenlendi” geçmişine yazılır ve cari bakiye yeniden hesaplanır.</div>' : '') + (cid && !editP ? '<div class="hint">' + esc(cariName(cid)) + ': ' + balsHTML(cid) + '</div>' : '') +
     fld('Cari (isteğe bağlı)', '<select name="cariId" data-pf="1"><option value="">— Cari yok (genel ' + (isIn ? 'tahsilat' : 'ödeme') + ') —</option>' + cs.map(function(c){ var bs = balancesOf(c.id), ks = ['TRY', 'USD', 'EUR'].filter(function(k){ return bs[k] !== undefined && Math.abs(bs[k]) > 0.004; }); return '<option value="' + c.id + '"' + (c.id === cid ? ' selected' : '') + '>' + esc(c.name) + ' · ' + (ks.length ? ks.map(function(k){ return (bs[k] > 0 ? 'Alacak ' : 'Borç ') + fm(Math.abs(bs[k]), k); }).join(' · ') : 'Kapalı') + '</option>'; }).join('') + '</select>') +
     '<div class="muted" style="margin:-4px 0 10px;font-size:12px">Cari seçmezseniz tutar yalnızca kasaya işlenir, hiçbir cari hesabın bakiyesini etkilemez. Açıklamayı Not alanına yazabilirsiniz.</div>' +
     '<div class="cols">' +
@@ -1801,6 +1907,7 @@ function payForm(dir, cid){
     '</div>' + (fx ? '<div id="pf_fx"></div>' : ''),
     function(f){
       var v = {amount:f.amount, cur:f.cur || 'TRY', date:f.date || today(), cariId:f.cariId || '', acc:f.acc || ''}, c = pfCalc(v);
+      if(lockGuard(v.date, editP && editP.date)) return false;
       if(c.a <= 0){ toast('Tutar girin', 'err'); return false; }
       if(c.err){ toast(c.err + '. Kuru yazın' + (fxAuto() ? ' ya da kurların güncellenmesini isteyin' : ''), 'err'); return false; }
       var used = c.cu !== 'TRY' || (v.cariId && c.acc !== 'TRY');
@@ -1813,9 +1920,22 @@ function payForm(dir, cid){
         pfNeed(v).forEach(function(k){ var man = !fxAuto() || PF.rman[k], row = fxAuto() ? rateRow(k, v.date) : null; fxr[k] = {r:num(PF.rate[k]), t:man ? 'man' : PF.rt, d:man ? v.date : (row ? row.date : v.date)}; last[k] = num(PF.rate[k]); });
         p.fxr = fxr; fxRemember(last);
       }
+      if(editP){
+        p.id = editP.id; p.ts = editP.ts; p.by = editP.by;
+        var chg = payDiff(editP, p);
+        if(!chg.length){ toast('Değişiklik yok'); return; }
+        p.rev = (editP.rev || []).concat([{ts:Date.now(), by:(cur() || {}).id || '', s:chg}]);
+        var ix = db.payments.findIndex(function(y){ return y.id === editP.id; }); if(ix >= 0) db.payments[ix] = p; else db.payments.push(p);
+        commit(); toast('Makbuz güncellendi'); return;
+      }
       db.payments.push(p);
       commit(); toast(isIn ? 'Tahsilat kaydedildi' : 'Ödeme kaydedildi');
-    }, 'Kaydet');
+    }, editP ? 'Değişiklikleri kaydet' : 'Kaydet');
+  if(editP){
+    var fe = $('#mf').elements;
+    fe.cariId.value = editP.cariId || ''; fe.amount.value = editP.cur ? editP.famt : editP.amount; if(fe.cur) fe.cur.value = editP.cur || 'TRY';
+    fe.date.value = editP.date; fe.method.value = editP.method || 'Nakit'; fe.note.value = editP.note || '';
+  }
   if(fx) pfRender();
 }
 
@@ -1975,6 +2095,7 @@ V.settings = function(){
     '</div>' +
     '<button class="btn pri" data-act="saveName">Kaydet</button></div>' + logoCard() + rcCard() + lblCard() + eanCard() + menusCard() : '') +
   ((fxAuto() && (ed || can('fx.use') || can('fx.rate'))) ? fxCard() : '') +
+  (can('admin') ? lockCard() : '') +
   (adm ? usersCard() : '') +
   (adm ? '<div class="card"><h3>Yedekleme</h3><p class="muted" style="margin-top:0">' + (SRV ? 'Veriler sunucudaki SQL Server veritabanında saklanır. Buradan indirilen dosya, ekrandaki verilerin bir kopyasıdır (şifreler dahil değildir). Veritabanı yedeği için sunucudaki yedek betiğini kullanın.' : 'Veriler bu tarayıcıda saklanır. Tarayıcı verisini temizlerseniz silinir; bu yüzden düzenli olarak yedek alın. Yedek kullanıcıları ve şifre özetlerini de içerir, güvenli bir yerde saklayın.') + '</p>' +
     '<div class="row-end" style="justify-content:flex-start;margin-bottom:10px"><button class="btn" data-act="downloadBackup">Yedek dosyası indir</button><button class="btn" data-act="exportData">Yedek metni oluştur</button>' + (SRV ? '' : '<label class="btn" style="cursor:pointer;margin:0">Dosyadan geri yükle<input type="file" id="bkfile" accept=".json,application/json,text/plain" style="display:none"></label><button class="btn" data-act="importData">Kutudaki metinden geri yükle</button>') + '</div>' +
@@ -2050,6 +2171,13 @@ A.catQuick = function(d){                                         // ürün kart
   commit(); vgRefresh(); toast('Eklendi ve seçildi');
 };
 A.cariCur = function(d){ state.cariCur = d.c; render(); };
+A.lockSave = function(){
+  var v = ($('#lk_date') || {}).value || '';
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(v)){ toast('Kapanış tarihi seçin', 'err'); return; }
+  if(v > today()){ toast('Kapanış tarihi bugünden ileri olamaz', 'err'); return; }
+  db.settings.lockDate = v; commit(); toast(fd(v) + ' ve öncesi kilitlendi');
+};
+A.lockClear = function(){ confirmBox('Kapanış kilidi kaldırılacak; eski tarihli kayıtlar yeniden eklenebilir ve değiştirilebilir olacak.', function(){ db.settings.lockDate = ''; commit(); toast('Kilit kaldırıldı'); }, 'Kaldır'); };
 A.fxqClear = function(){ state.fxq = {from:'', to:''}; render(); };
 A.fxAuto = function(d){ var ed = state.ed[d.type]; if(!ed) return; ed.rman[d.c] = false; fxRefresh(ed); fxLines(ed); render(); };
 A.fxUpdate = async function(){
@@ -2156,6 +2284,7 @@ A.saveDoc = async function(d){
     else { if(!vb.c.length) l.cl = ''; if(!vb.s.length) l.sz = ''; }
   });
   if(vbad){ toast(vbad, 'err'); return; }
+  if(!ed.editId && lockGuard(ed.date || today())) return;
   fxEnsure(ed, type); fxLines(ed);
   var pr = edPricing(type, ed);
   syncPay(ed, pr.total);
@@ -2189,8 +2318,38 @@ A.saveDoc = async function(d){
   if(ed.ref && (type === 'sret' || type === 'pret')){
     var byp = {};
     pr.lines.forEach(function(l){ var k = vkey(l); byp[k] = (byp[k] || 0) + l.qty; });
-    var bad = Object.keys(byp).find(function(k){ var a = k.split('|'); return byp[k] > remainingQty(ed.ref, a[0], a[1], a[2]) + 0.0001; });
-    if(bad){ var ba = bad.split('|'); toast('İade miktarı kalan iade edilebilir miktarı aşıyor: ' + ((prod(ba[0]) || {}).name || '') + (ba[1] || ba[2] ? ' (' + varLabel(ba[1], ba[2]) + ')' : '') + ' (en fazla ' + qf(remainingQty(ed.ref, ba[0], ba[1], ba[2])) + ')', 'err'); return; }
+    var bad = Object.keys(byp).find(function(k){ var a = k.split('|'); return byp[k] > remainingQty(ed.ref, a[0], a[1], a[2], ed.editId) + 0.0001; });
+    if(bad){ var ba = bad.split('|'); toast('İade miktarı kalan iade edilebilir miktarı aşıyor: ' + ((prod(ba[0]) || {}).name || '') + (ba[1] || ba[2] ? ' (' + varLabel(ba[1], ba[2]) + ')' : '') + ' (en fazla ' + qf(remainingQty(ed.ref, ba[0], ba[1], ba[2], ed.editId)) + ')', 'err'); return; }
+  }
+  if(ed.editId){                                               // ---- mevcut belgenin düzenlenmesi
+    var old = db.docs.find(function(y){ return y.id === ed.editId; });
+    if(!old){ toast('Düzenlenen belge bulunamadı', 'err'); return; }
+    if(!can('revise.docs') || !can(DOC_PERM[type])){ toast('Bu belgeyi düzenleme yetkiniz yok', 'err'); return; }
+    if(lockGuard(old.date, ed.date || today())) return;
+    var rets = db.docs.filter(function(y){ return y.ref === old.id; });
+    if(rets.length){
+      if((ed.cariId || '') !== (old.cariId || '')){ toast('İadesi yapılmış belgenin carisi değiştirilemez', 'err'); return; }
+      var rb = {}, nq = {};
+      rets.forEach(function(r0){ r0.lines.forEach(function(l){ var k = vkey(l); rb[k] = (rb[k] || 0) + l.qty; }); });
+      pr.lines.forEach(function(l){ var k = vkey(l); nq[k] = (nq[k] || 0) + l.qty; });
+      var low = Object.keys(rb).find(function(k){ return (nq[k] || 0) < rb[k] - 0.0001; });
+      if(low){ var la = low.split('|'); toast('İade edilmiş kalem azaltılamaz: ' + ((prod(la[0]) || {}).name || '') + (la[1] || la[2] ? ' (' + varLabel(la[1], la[2]) + ')' : '') + ' (iade edilen ' + qf(rb[low]) + ')', 'err'); return; }
+    }
+    var chg = revDiff(old, {date:ed.date || today(), cariId:ed.cariId, note:ed.note || '', pays:pays, lines:pr.lines, total:total, cur:fx.cur, fxr:fx.fxr});
+    if(!chg.length){ state.ed[type] = null; render(); toast('Değişiklik yok'); return; }
+    var T2 = TYPES[type], eff = {};                              // stok etkisi: eski hareketler geri alınır, yeniler eklenir
+    db.moves.filter(function(m){ return m.ref === old.id; }).forEach(function(m){ var k = m.pid + '|' + nv(m.cl) + '|' + nv(m.sz); eff[k] = (eff[k] || 0) - m.qty; });
+    pr.lines.forEach(function(l){ var k = vkey(l); eff[k] = (eff[k] || 0) + T2.stock * l.qty; });
+    var neg = Object.keys(eff).filter(function(k){ var a = k.split('|'); return eff[k] < -0.0001 && stockV(a[0], a[1], a[2]) + eff[k] < -0.0001; });
+    if(neg.length && !d.force){
+      confirmBox('Düzenleme sonrası stok eksiye düşecek: ' + neg.slice(0, 4).map(function(k){ var a = k.split('|'); return ((prod(a[0]) || {}).name || '') + (a[1] || a[2] ? ' (' + varLabel(a[1], a[2]) + ')' : ''); }).join(', ') + (neg.length > 4 ? ' …' : '') + '. Devam edilsin mi?', function(){ A.saveDoc({type:type, force:'1'}); }, 'Devam et');
+      return;
+    }
+    var rev = (old.rev || []).concat([{ts:Date.now(), by:(cur() || {}).id || '', s:chg}]);
+    var nd2 = createDoc({type:type, no:old.no, date:ed.date || today(), cariId:ed.cariId, lines:ed.lines, docDisc:ed.docDisc, pays:pays, note:ed.note, ref:old.ref, cur:fx.cur, ftotal:fx.ftotal, fxr:fx.fxr, tnd:fx.tnd, chg:fx.chg, edit:old, rev:rev});
+    state.ed[type] = null; commit(); toast(KIND[type] + ' güncellendi');
+    A.openDoc({id:nd2.id});
+    return;
   }
   var rno = null;
   if(SRV){ try{ rno = (await api('POST', '/api/reserve', {type:type})).no; }catch(e){ if(e.status === 401) srvLogout('Oturum süresi doldu, yeniden giriş yapın'); else toast(e.message || 'Belge numarası alınamadı, bağlantıyı kontrol edin', 'err'); return; } }
@@ -2209,17 +2368,18 @@ A.openDoc = function(d){
   var retT = x.type === 'sale' ? 'sret' : x.type === 'purchase' ? 'pret' : '';
   var refBtn = (retT && can(DOC_PERM[retT]) && docHasRemaining(x)) ? '<button type="button" class="btn" data-act="refundDoc" data-id="' + x.id + '">' + (retT === 'sret' ? 'İade al' : 'İade yap') + '</button>' : '';
   modal(KIND[x.type] + ' ' + x.no,
-    '<div class="hint">' + fd(x.date) + ' · ' + esc(cariName(x.cariId)) + (x.note ? ' · ' + esc(x.note) : '') + (x.by ? ' · ' + esc(userName(x.by)) : '') + (x.refNo ? ' · Bağlı belge: ' + esc(x.refNo) : '') + '</div>' + fxDocInfo(x) +
+    '<div class="hint">' + fd(x.date) + ' · ' + esc(cariName(x.cariId)) + (x.note ? ' · ' + esc(x.note) : '') + (x.by ? ' · ' + esc(userName(x.by)) : '') + (x.refNo ? ' · Bağlı belge: ' + esc(x.refNo) : '') + (x.rev && x.rev.length ? ' · <span class="tag move">Düzenlendi ' + fd(revDay(x.rev)) + '</span>' : '') + '</div>' + fxDocInfo(x) + revHTML(x.rev) +
     '<div class="tbl"><table><thead><tr><th>Ürün</th><th class="r">Miktar</th><th class="r">Fiyat</th><th class="r">İndirim</th><th class="r">Tutar</th></tr></thead><tbody>' + x.lines.map(function(l){
       var p = prod(l.pid), ld = r2(lg(l) - lt(l));
       return '<tr><td>' + esc(p ? p.name : '(silinmiş)') + (l.cl || l.sz ? '<div class="muted" style="font-size:12px">' + esc(varLabel(l.cl, l.sz)) + '</div>' : '') + '</td><td class="r">' + qf(l.qty) + ' ' + esc(p ? p.unit : '') + '</td><td class="r">' + money(l.price) + '</td><td class="r">' + (ld > 0.004 ? '−' + money(ld) + (l.camp ? '<div class="muted">' + esc(l.camp) + '</div>' : '') : '') + '</td><td class="r">' + money(lt(l)) + '</td></tr>';
     }).join('') + '</tbody></table></div>' +
     lrHtml + '<p style="text-align:right;margin:10px 0 0">' + (disc > 0.004 ? '<span class="muted">Ara toplam ' + money(x.gross) + ' · İndirim −' + money(disc) + '</span><br>' : '') + '<span class="muted">KDV hariç ' + money(vs.net) + ' · KDV ' + money(vs.vat) + '</span><br><b>Toplam ' + money(x.total) + '</b><br><span class="muted">' + TYPES[x.type].paidLabel + ' ' + money(x.paid) + (pm ? ' (' + pm + ')' : '') + '</span> · Kalan ' + money(rest) + '</p>',
-    null, null, refBtn + '<button type="button" class="btn" data-act="receipt" data-kind="doc" data-id="' + x.id + '">Fiş yazdır</button>' + (can(DOC_DEL[x.type]) ? '<button type="button" class="btn danger" data-act="delDoc" data-id="' + x.id + '">Sil</button>' : ''), true);
+    null, null, (canEditDoc(x) ? '<button type="button" class="btn" data-act="editDoc" data-id="' + x.id + '">Düzenle</button>' : '') + refBtn + '<button type="button" class="btn" data-act="receipt" data-kind="doc" data-id="' + x.id + '">Fiş yazdır</button>' + (can(DOC_DEL[x.type]) ? '<button type="button" class="btn danger" data-act="delDoc" data-id="' + x.id + '">Sil</button>' : ''), true);
 };
 A.delDoc = function(d){
   var xd = db.docs.find(function(y){ return y.id === d.id; });
   if(xd && !can(DOC_DEL[xd.type])){ toast('Bu işlem için yetkiniz yok', 'err'); return; }
+  if(xd && lockGuard(xd.date)) return;
   if(xd && db.docs.some(function(y){ return y.ref === xd.id; })){ toast('Bu belgeye bağlı iade kayıtları var. Önce iadeleri silin.', 'err'); return; }
   confirmBox('Bu işlem silinecek ve stok hareketleri geri alınacak. Devam edilsin mi?', function(){
     db.docs = db.docs.filter(function(x){ return x.id !== d.id; });
@@ -2237,9 +2397,23 @@ A.delProduct = function(d){
     db.caris.forEach(function(c){ if(c.prices && c.prices[d.id] != null){ delete c.prices[d.id]; if(!Object.keys(c.prices).length) delete c.prices; } });
     db.products = db.products.filter(function(p){ return p.id !== d.id; }); db.moves = db.moves.filter(function(m){ return m.pid !== d.id; }); commit(); toast('Ürün silindi'); });
 };
+A.editDoc = function(d){
+  var x = db.docs.find(function(y){ return y.id === d.id; }); if(!x) return;
+  if(!canEditDoc(x)){ toast(isLocked(x.date) ? 'Kapanış tarihi (' + fd(lockDate()) + ') ve öncesindeki belgeler düzenlenemez' : 'Bu belgeyi düzenleme yetkiniz yok', 'err'); return; }
+  var pair = x.type === 'sale' || x.type === 'sret' ? ['sale', 'sret'] : ['purchase', 'pret'];
+  if(state.ed[pair[0]] || state.ed[pair[1]]){ toast('Açık bir belge taslağı var. Önce onu kaydedin veya vazgeçin', 'err'); return; }
+  closeModal(); state.tab = pair[0] === 'sale' ? 'sales' : 'purchases';
+  state.ed[x.type] = docToEd(x); render(); window.scrollTo(0, 0);
+};
+A.editPay = function(d){
+  var p = db.payments.find(function(y){ return y.id === d.id; }); if(!p) return;
+  if(!canEditPay(p)){ toast(isLocked(p.date) ? 'Kapanış tarihi (' + fd(lockDate()) + ') ve öncesindeki makbuzlar düzenlenemez' : 'Bu makbuzu düzenleme yetkiniz yok', 'err'); return; }
+  payForm(p.dir, p.cariId, p);
+};
 A.mvView = function(d){ state.sq.mv = d.v === 'var' ? 'var' : 'prod'; render(); };
 A.delMove = function(d){
   var ids = d.ids ? String(d.ids).split(',') : [d.id];
+  if(db.moves.some(function(m){ return ids.indexOf(m.id) >= 0 && lockGuard(m.date); })) return;
   confirmBox(ids.length > 1 ? ids.length + ' stok hareketi silinecek.' : 'Bu stok hareketi silinecek.', function(){ db.moves = db.moves.filter(function(m){ return ids.indexOf(m.id) < 0; }); commit(); });
 };
 A.stockMove = function(d){
@@ -2252,6 +2426,7 @@ A.cancelStock = function(){ state.ed.stock = null; render(); };
 A.saveStock = function(){
   var ed = state.ed.stock; if(!ed) return;
   if(!can('stockmove')){ toast('Bu işlem için yetkiniz yok', 'err'); return; }
+  if(lockGuard(ed.date || today())) return;
   var out = ed.dir === 'out', items = [], bad = null;
   ed.lines.forEach(function(l, i){
     if(bad || !l.pid) return;                                     // ürün seçilmemiş satırlar atlanır
@@ -2289,7 +2464,7 @@ A.delCari = function(d){
   confirmBox('Cari kartı silinecek.', function(){ db.campaigns.forEach(function(k){ if(Array.isArray(k.cids)) k.cids = k.cids.filter(function(id){ return id !== d.id; }); }); db.caris = db.caris.filter(function(c){ return c.id !== d.id; }); state.cariId = null; commit(); toast('Cari silindi'); });
 };
 A.newPay = function(d){ if(!can(d.dir === 'out' ? 'payout' : 'collect')){ toast('Bu işlem için yetkiniz yok', 'err'); return; } payForm(d.dir, d.cid); };
-A.delPay = function(d){ confirmBox('Bu kayıt silinecek ve cari bakiyesi yeniden hesaplanacak.', function(){ db.payments = db.payments.filter(function(p){ return p.id !== d.id; }); commit(); }); };
+A.delPay = function(d){ var p0 = db.payments.find(function(p){ return p.id === d.id; }); if(p0 && lockGuard(p0.date)) return; confirmBox('Bu kayıt silinecek ve cari bakiyesi yeniden hesaplanacak.', function(){ db.payments = db.payments.filter(function(p){ return p.id !== d.id; }); commit(); }); };
 A.repPreset = function(d){
   var n = new Date(), p = d.p, f = '', t = today();
   if(p === 'today') f = t;
@@ -2390,7 +2565,8 @@ function onEd(e){
       l[f] = t.value;
       if(f === 'price') l.pm = true;                                // elle girilen fiyat, cari/tür değişince korunur
       if(f === 'pf'){ l.pm = true; l.price = String(r4(num(t.value) * docRate(ed, ed.cur))); }          // dövizli belge: döviz fiyatı → TL
-      if(f === 'cl' || f === 'sz'){ render(); return; }
+      if(f === 'cl' || f === 'sz'){ delete l.fc; render(); return; }
+      if(f === 'pid' || f === 'price' || f === 'pf') delete l.fc;
       if(f === 'pid'){ l.cl = ''; l.sz = ''; var p = prod(t.value); if(p){ l.price = lineDefault(type, ed, p); l.pm = false; l.lp = l.price; l.pf = ''; } l.noCamp = false; render(); return; }
     }
   } else if(f.indexOf('pay_') === 0){
@@ -3191,15 +3367,15 @@ A.impExcel = function(){
 
 /* ---------- Bağlı iade ---------- */
 function origDoc(id){ return db.docs.find(function(d){ return d.id === id; }); }
-function returnedQty(origId, pid, cl, sz){
+function returnedQty(origId, pid, cl, sz, except){
   cl = nv(cl); sz = nv(sz);
-  return sum(db.docs.filter(function(d){ return d.ref === origId && (d.type === 'sret' || d.type === 'pret'); }), function(d){ return sum(d.lines.filter(function(l){ return l.pid === pid && nv(l.cl) === cl && nv(l.sz) === sz; }), function(l){ return l.qty; }); });
+  return sum(db.docs.filter(function(d){ return d.ref === origId && d.id !== except && (d.type === 'sret' || d.type === 'pret'); }), function(d){ return sum(d.lines.filter(function(l){ return l.pid === pid && nv(l.cl) === cl && nv(l.sz) === sz; }), function(l){ return l.qty; }); });
 }
-function remainingQty(origId, pid, cl, sz){
+function remainingQty(origId, pid, cl, sz, except){
   var o = origDoc(origId); if(!o) return 0;
   cl = nv(cl); sz = nv(sz);
   var sold = sum(o.lines.filter(function(l){ return l.pid === pid && nv(l.cl) === cl && nv(l.sz) === sz; }), function(l){ return l.qty; });
-  return r2(sold - returnedQty(origId, pid, cl, sz));
+  return r2(sold - returnedQty(origId, pid, cl, sz, except));
 }
 function docHasRemaining(o){ return o.lines.some(function(l){ return remainingQty(o.id, l.pid, l.cl, l.sz) > 0.0001; }); }
 function docProducts(id){
@@ -3273,6 +3449,13 @@ A.saveEan = function(){
   db.settings.eanPrefix = v; commit(); toast('Barkod başlangıcı kaydedildi: ' + v);
 };
 A.eanReset = function(){ delete db.settings.eanPrefix; commit(); toast('Varsayılan başlangıca (29) dönüldü'); };
+function lockCard(){
+  var l = lockDate();
+  return '<div class="card"><h3>Kapanış kilidi</h3><p class="muted" style="margin-top:0">Seçtiğiniz tarih ve öncesindeki tarihler için satış/alış belgesi, tahsilat/ödeme ve elle stok hareketi <b>eklenemez, düzenlenemez, silinemez</b>. Dönem kapandıktan sonra kayıtların değişmesini önler. Bu tarihi yalnızca yönetici değiştirebilir.</p>' +
+    '<div class="muted" style="font-size:13px;margin-bottom:8px">' + (l ? 'Şu an kilitli: <b>' + fd(l) + '</b> ve öncesi' : 'Şu an kilit yok.') + '</div>' +
+    '<div class="cols" style="max-width:420px">' + fld('Kapanış tarihi', '<input type="date" id="lk_date" value="' + esc(l) + '">') + '</div>' +
+    '<div class="chips"><button class="btn pri" data-act="lockSave">Kilidi uygula</button>' + (l ? '<button class="btn" data-act="lockClear">Kilidi kaldır</button>' : '') + '</div></div>';
+}
 function fxDays(){                                              // varsayılan bugün; aralık verilirse aralıktaki her gün (yayın olmayan günler son yayınlanan kurla)
   var q = state.fxq || {}, t = today(), a = q.from || q.to || t, b = q.to || q.from || t;
   if(a > b){ var x = a; a = b; b = x; }
@@ -3734,6 +3917,7 @@ function rcptDoc(x){
   if(x.refNo) h += '<div class="rr"><span>Bağlı belge</span><span>' + esc(x.refNo) + '</span></div>';
   if(x.cariId && rc.cari) h += '<div class="rr"><span>Cari</span><span>' + esc(cariName(x.cariId)) + '</span></div>';
   if(x.by && rc.user) h += '<div class="rr"><span>Kullanıcı</span><span>' + esc(userName(x.by)) + '</span></div>';
+  if(x.rev && x.rev.length) h += '<div class="rr"><span>Düzenlendi</span><span>' + fd(revDay(x.rev)) + '</span></div>';
   h += '<hr>';
   var gSum = 0, cSum = 0, mSum = 0, dSum = 0;
   x.lines.forEach(function(l){
@@ -3772,6 +3956,7 @@ function rcptPay(p){
   if(p.cariId && rc.cari) h += '<div class="rr"><span>Cari</span><span>' + esc(cariName(p.cariId)) + '</span></div>';
   h += '<div class="rr"><span>Yöntem</span><span>' + esc(p.method) + '</span></div>';
   if(p.by && rc.user) h += '<div class="rr"><span>Kullanıcı</span><span>' + esc(userName(p.by)) + '</span></div>';
+  if(p.rev && p.rev.length) h += '<div class="rr"><span>Düzenlendi</span><span>' + fd(revDay(p.rev)) + '</span></div>';
   h += '<hr><div class="rr b"><span>TUTAR</span><span>' + (p.cur ? esc(fm(p.famt, p.cur)) : money(p.amount)) + '</span></div>';
   if(p.cur && p.fxr && p.fxr[p.cur]) h += '<div class="rr"><span>Kur ' + esc(p.cur) + '</span><span>' + esc(rateFmt(p.fxr[p.cur].r)) + '</span></div><div class="rr"><span>TL karşılığı</span><span>' + money(p.amount) + '</span></div>';
   if(p.cariId && payAcc(p) !== (p.cur || 'TRY')) h += '<div class="rr"><span>Cari hesaba işlenen</span><span>' + esc(fm(payAccAmt(p), payAcc(p))) + '</span></div>';
