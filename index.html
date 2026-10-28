@@ -1879,7 +1879,7 @@ function cariPriceForm(id){
     '<div class="hint">Bu cariye satış yaparken fiyat şu sırayla belirlenir: önce aşağıda girilen <b>özel fiyat</b>; yoksa seçilen <b>fiyat türü</b> (toptan fiyatı olmayan ürünlerde perakende); hiçbiri yoksa <b>perakende fiyat</b>. Satış ekranında satır fiyatını elle değiştirebilirsiniz.</div>' + cpFields(c, false),
     function(f){ cpApply(c, f); commit(); toast('Fiyat tanımları kaydedildi'); });
 }
-/* Telefon ve e-posta biçimi: telefon 0535 365 21 92 (yalnız rakam, otomatik boşluk), e-posta yalnız İngilizce karakter ve tek @ */
+/* Telefon ve e-posta biçimi: telefon 05xx xxx xx xx (yalnız rakam, otomatik boşluk), e-posta yalnız İngilizce karakter ve tek @ */
 function fmtPhone(v){
   var d = String(v == null ? '' : v).replace(/\D/g, '');
   if(d && d.charAt(0) !== '0') d = '0' + d;
@@ -1915,8 +1915,8 @@ function cariForm(id, after, defType, defGrp){
     '<div class="cols">' +
       (grp0 === 'retail' ? '<input type="hidden" name="type" value="musteri">' : fld('Tür', '<select name="type"><option value="musteri"' + (ty0 === 'musteri' ? ' selected' : '') + '>Müşteri</option><option value="tedarikci"' + (ty0 === 'tedarikci' ? ' selected' : '') + '>Tedarikçi</option><option value="ikisi"' + (ty0 === 'ikisi' ? ' selected' : '') + '>Her ikisi</option></select>')) +
       fld('Grup', '<select name="grp"><option value=""' + (grp0 === 'retail' ? '' : ' selected') + '>Cari (toptan)</option><option value="retail"' + (grp0 === 'retail' ? ' selected' : '') + '>Perakende müşteri</option></select>') +
-      fld('Cep telefonu', '<input name="phone" type="tel" inputmode="numeric" autocomplete="off" data-fmt="phone" placeholder="0535 365 21 92" value="' + esc(c ? c.phone : '') + '">') +
-      fld('E-posta', '<input name="email" type="text" inputmode="email" autocapitalize="none" autocorrect="off" spellcheck="false" autocomplete="off" data-fmt="email" placeholder="ad@alanadi.com" value="' + esc(c ? c.email : '') + '">') +
+      fld('Cep telefonu', '<input name="phone" type="tel" inputmode="numeric" autocomplete="off" data-fmt="phone" placeholder="" value="' + esc(c ? c.phone : '') + '">') +
+      fld('E-posta', '<input name="email" type="text" inputmode="email" autocapitalize="none" autocorrect="off" spellcheck="false" autocomplete="off" data-fmt="email" placeholder="" value="' + esc(c ? c.email : '') + '">') +
       fld('Devir bakiyesi (₺)', '<input name="open" type="number" step="any" min="0" value="' + (open ? Math.abs(open) : '') + '" placeholder="0">') +
       fld('Devir yönü', '<select name="odir"><option value="1"' + (open >= 0 ? ' selected' : '') + '>Cari bize borçlu (alacak)</option><option value="-1"' + (open < 0 ? ' selected' : '') + '>Biz cariye borçluyuz</option></select>') +
     '</div>' + fld('Adres / not', '<input name="note" value="' + esc(c ? c.note : '') + '">') +
@@ -1927,7 +1927,7 @@ function cariForm(id, after, defType, defGrp){
       var name = f.name.trim(); if(!name){ toast('Cari adı girin', 'err'); return false; }
       var ph = (c && f.phone.trim() === (c.phone || '')) ? (c.phone || '') : fmtPhone(f.phone);          // dokunulmamış eski değer olduğu gibi korunur
       var em = (c && f.email.trim() === (c.email || '')) ? (c.email || '') : fmtEmail(f.email); if(em === '@') em = '';
-      if(ph && ph !== (c ? c.phone : '') && !validPhone(ph)){ toast('Telefon 0535 365 21 92 biçiminde (11 rakam) olmalı', 'err'); return false; }
+      if(ph && ph !== (c ? c.phone : '') && !validPhone(ph)){ toast('Telefon 05xx xxx xx xx biçiminde (11 rakam) olmalı', 'err'); return false; }
       if(em && em !== (c ? c.email : '') && !validEmail(em)){ toast('E-posta ad@alanadi.com biçiminde olmalı (Türkçe karakter ve boşluk olmadan)', 'err'); return false; }
       var o = r2(num(f.open) * num(f.odir)), ofx = {};
       if(fxOn()) FX_CURS.forEach(function(cu){ var v = r2(num(f['open_' + cu]) * num(f['odir_' + cu])); if(v) ofx[cu] = v; });
