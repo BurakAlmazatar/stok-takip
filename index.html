@@ -238,7 +238,7 @@ label.f>input,label.f>select,label.f>textarea{margin-top:4px;font-weight:400}
 <script>
 /* ---------- Veri ---------- */
 var KEY = 'stokcari_v1';
-var APP_VERSION = '2026.10.25-19';
+var APP_VERSION = '2026.10.25-20';
 function defaults(){ return {products:[],caris:[],docs:[],payments:[],moves:[],counters:{sale:0,purchase:0},seq:1,users:[],campaigns:[],rates:[],settings:{name:'',phone:'',address:'',taxNo:'',footer:'',logo:'',logoRcpt:false,attrVals:[[],[],[],[],[]]}}; }
 function load(){
   try{ var s = localStorage.getItem(KEY); if(s){ var o = JSON.parse(s); return Object.assign(defaults(), o); } }catch(e){}
@@ -723,7 +723,7 @@ function campPriceText(c){                                       // "Çay 500,00
   return parts.length <= 3 ? parts.join(', ') : parts.slice(0, 3).join(', ') + ' ve ' + (parts.length - 3) + ' ürün daha';
 }
 function campText(c){
-  var r = c.type === 'pct' ? '%' + qf(c.v) + ' indirim' : c.type === 'amt' ? money(c.v) + ' indirim (birim başına)' : c.type === 'price' ? 'Kampanyalı fiyat: ' + campPriceText(c) : c.buy + ' al ' + c.pay + ' öde' + (c.basket === false ? ' (aynı üründen)' : ' (sepet, en ucuz bedava)');
+  var r = c.type === 'pct' ? '%' + qf(c.v) + ' indirim' : c.type === 'amt' ? money(c.v) + ' indirim (birim başına)' : c.type === 'price' ? (c.scope === 'prod' ? 'Kampanyalı fiyat: ' + campPriceText(c) : 'Sabit kampanya fiyatı: ' + money(c.v)) : c.buy + ' al ' + c.pay + ' öde' + (c.basket === false ? ' (aynı üründen)' : ' (sepet, en ucuz bedava)');
   if(c.type !== 'buy' && num(c.minQty) > 1) r += ' · en az ' + qf(c.minQty) + ' adet';
   if(num(c.minTotal) > 0) r += ' · ' + money(c.minTotal) + ' ve üzeri alışverişte';
   return r;
@@ -784,7 +784,7 @@ function bestCampaign(p, qty, price, date, cariId, stype, bg){
     if(c.type === 'buy' && c.basket !== false) return;
     var amt = 0;
     if(c.type === 'price'){                                                        // kampanyalı fiyat: ürün liste fiyatından okunur, kampanya fiyatına düşer
-      var cp = c.prices ? num(c.prices[p.id]) : 0;
+      var cp = c.scope === 'prod' ? (c.prices ? num(c.prices[p.id]) : 0) : num(c.v);          // belirli ürünler: ürüne özel fiyat; tüm ürünler / özellik: tek sabit fiyat
       if(cp > 0 && price > cp && qty >= (num(c.minQty) || 1)) amt = qty * (price - cp);
     } else if(c.type === 'buy'){
       var n = num(c.buy), m = num(c.pay);
@@ -2845,8 +2845,10 @@ V.campaigns = function(){
 };
 function campToggle(){
   var f = $('#mf'); if(!f || !f.elements.type || !f.elements.scope) return;
-  var ty = f.elements.type.value, sc = ty === 'price' ? 'prod' : f.elements.scope.value;
+  var ty = f.elements.type.value, sc = f.elements.scope.value;
   f.querySelectorAll('[data-ft]').forEach(function(el){ el.hidden = el.dataset.ft.split(' ').indexOf(ty) < 0; });
+  f.querySelectorAll('[data-pp]').forEach(function(el){ el.hidden = !(ty === 'price' && sc === 'prod'); });          // ürün başına kampanya fiyatı: yalnız belirli ürünlerde
+  f.querySelectorAll('[data-pv]').forEach(function(el){ el.hidden = !(ty === 'price' && sc !== 'prod'); });          // tek sabit fiyat: tüm ürünler veya özellik kapsamında
   f.querySelectorAll('[data-fs]').forEach(function(el){ el.hidden = el.dataset.fs !== sc; });
   var au = f.elements.aud ? f.elements.aud.value : 'all';
   f.querySelectorAll('[data-fa]').forEach(function(el){ el.hidden = el.dataset.fa !== au; });
@@ -2902,12 +2904,13 @@ function campForm(id){
     '<div class="muted" style="font-size:12px;margin:-4px 0 8px">Boş bırakırsanız tutar şartı aranmaz. Doldurursanız kampanya, satış belgesindeki <b>tüm satırların toplamı</b> (indirimler öncesi, KDV dahil) bu tutara ulaşınca çalışır.</div>' +
     '<div data-ft="buy"><div class="cols">' + fld('Kaç al', '<input name="buy" type="number" step="any" placeholder="3" value="' + (c && c.buy ? c.buy : '') + '">') + fld('Kaç öde', '<input name="pay" type="number" step="any" placeholder="2" value="' + (c && c.type === 'buy' ? c.pay : '') + '">') + '</div>' +
       fld('Sayım şekli', '<select name="basket"><option value="1"' + (c && c.basket === false ? '' : ' selected') + '>Sepet: kapsama giren tüm ürünler birlikte sayılır, en ucuz ürün bedava</option><option value="0"' + (c && c.basket === false ? ' selected' : '') + '>Her ürün kendi içinde (aynı üründen N adet)</option></select>') + '</div>' +
-    '<div data-ft="pct amt buy">' + fld('Kapsam', '<select name="scope"><option value="all"' + sel(c && c.scope, 'all') + '>Tüm ürünler</option><option value="prod"' + sel(c && c.scope, 'prod') + '>Belirli ürünler (birden fazla seçilebilir)</option><option value="attr"' + sel(c && c.scope, 'attr') + '>Ürün özelliğine göre (birden fazla değer seçilebilir)</option></select>') + '</div>' +
-    '<div data-ft="price" class="muted" style="font-size:12px;margin-bottom:6px">Ürün kartındaki fiyat değişmez: satışta ürün liste fiyatıyla okunur, kampanya çalışınca aşağıda yazdığınız kampanya fiyatına düşer. Ürünleri işaretleyip fiyatlarını yazın; çok sayıda ürün için önce işaretleyin, sonra <b>toplu fiyat</b> uygulayın.</div>' +
-    '<div data-ft="price" class="pickbar" style="flex-wrap:wrap"><select name="bulkmode" style="max-width:100%;flex:1 1 220px;width:auto"><option value="pct">Liste fiyatından % indirimli</option><option value="amt">Liste fiyatından ₺ indirimli</option><option value="fix">Sabit fiyat (₺)</option></select><input name="bulkv" type="number" step="any" min="0" placeholder="Değer" style="max-width:110px"><button type="button" class="btn sm" data-act="campBulk">İşaretlilere uygula</button></div>' +
+    fld('Kapsam', '<select name="scope"><option value="all"' + sel(c && c.scope, 'all') + '>Tüm ürünler</option><option value="prod"' + sel(c && c.scope, 'prod') + '>Belirli ürünler (birden fazla seçilebilir)</option><option value="attr"' + sel(c && c.scope, 'attr') + '>Ürün özelliğine göre (birden fazla değer seçilebilir)</option></select>') +
+    '<div data-pv hidden>' + fld('Sabit kampanya fiyatı (₺)', '<input name="pv" type="number" step="any" min="0" placeholder="Örn. 99" value="' + (c && c.type === 'price' && c.scope !== 'prod' && c.v ? c.v : '') + '">') + '<div class="muted" style="font-size:12px;margin:-4px 0 8px">Seçtiğiniz kapsamdaki her ürün, liste fiyatı bu tutardan yüksekse bu fiyata düşer. Ürün kartındaki fiyatlar değişmez. Her ürüne ayrı fiyat vermek için kapsamı “Belirli ürünler” yapın.</div></div>' +
+    '<div data-pp class="muted" style="font-size:12px;margin-bottom:6px">Ürün kartındaki fiyat değişmez: satışta ürün liste fiyatıyla okunur, kampanya çalışınca aşağıda yazdığınız kampanya fiyatına düşer. Ürünleri işaretleyip fiyatlarını yazın; çok sayıda ürün için önce işaretleyin, sonra <b>toplu fiyat</b> uygulayın.</div>' +
+    '<div data-pp class="pickbar" style="flex-wrap:wrap"><select name="bulkmode" style="max-width:100%;flex:1 1 220px;width:auto"><option value="pct">Liste fiyatından % indirimli</option><option value="amt">Liste fiyatından ₺ indirimli</option><option value="fix">Sabit fiyat (₺)</option></select><input name="bulkv" type="number" step="any" min="0" placeholder="Değer" style="max-width:110px"><button type="button" class="btn sm" data-act="campBulk">İşaretlilere uygula</button></div>' +
     '<div data-fs="prod"><div class="pickbar"><input type="search" data-cf="1" placeholder="Ürün adı, kod veya barkod ara" autocomplete="off"><button type="button" class="btn sm" data-act="campPick" data-m="on">Görünenleri seç</button><button type="button" class="btn sm" data-act="campPick" data-m="off">Görünenleri kaldır</button></div>' +
       '<div class="pick" id="pickprod">' + (prodSorted.length ? prodSorted.map(function(p){
-        return '<label class="chk pk" data-t="' + esc(nz(p.name + ' ' + (p.code || '') + ' ' + (p.barcode || ''))) + '"><input type="checkbox" name="pid:' + esc(p.id) + '"' + (sl.pids.indexOf(p.id) >= 0 ? ' checked' : '') + '> <span>' + esc(p.name) + (p.code ? ' <span class="muted">· ' + esc(p.code) + '</span>' : '') + '</span><span class="muted" data-ft="price" hidden style="margin-left:auto;font-size:12px;white-space:nowrap">liste ' + money(p.price) + (num(p.wprice) > 0 ? ' · toptan ' + money(p.wprice) : '') + '</span><input data-ft="price" hidden name="cp:' + esc(p.id) + '" type="number" step="any" min="0" placeholder="Kamp. fiyat" value="' + (c && c.prices && c.prices[p.id] ? c.prices[p.id] : '') + '" style="width:110px;padding:4px 6px"></label>';
+        return '<label class="chk pk" data-t="' + esc(nz(p.name + ' ' + (p.code || '') + ' ' + (p.barcode || ''))) + '"><input type="checkbox" name="pid:' + esc(p.id) + '"' + (sl.pids.indexOf(p.id) >= 0 ? ' checked' : '') + '> <span>' + esc(p.name) + (p.code ? ' <span class="muted">· ' + esc(p.code) + '</span>' : '') + '</span><span class="muted" data-pp hidden style="margin-left:auto;font-size:12px;white-space:nowrap">liste ' + money(p.price) + (num(p.wprice) > 0 ? ' · toptan ' + money(p.wprice) : '') + '</span><input data-pp hidden name="cp:' + esc(p.id) + '" type="number" step="any" min="0" placeholder="Kamp. fiyat" value="' + (c && c.prices && c.prices[p.id] ? c.prices[p.id] : '') + '" style="width:110px;padding:4px 6px"></label>';
       }).join('') : '<div class="muted">Henüz ürün yok.</div>') + '</div><div class="muted" id="campcnt" style="font-size:12px;margin-top:4px"></div></div>' +
     '<div data-fs="attr"><div class="muted" style="font-size:12px;margin-bottom:6px">Bir özellikten birden fazla değer seçerseniz ürünün bunlardan biri olması yeter (veya). Farklı özelliklerden seçim yaparsanız ürünün hepsini sağlaması gerekir (ve). Örnek: Marka = A veya B, Renk = Kırmızı.</div>' +
       names.map(function(n, i){
@@ -2928,7 +2931,6 @@ function campForm(id){
     fld('Durum', '<select name="active"><option value="1">Aktif</option><option value="0"' + (c && c.active === false ? ' selected' : '') + '>Pasif</option></select>'),
     function(f){
       var name = f.name.trim(); if(!name){ toast('Kampanya adı girin', 'err'); return false; }
-      if(f.type === 'price') f.scope = 'prod';
       var pids = Object.keys(f).filter(function(k){ return k.indexOf('pid:') === 0; }).map(function(k){ return k.slice(4); });
       var avs = [[], [], [], [], []];
       Object.keys(f).forEach(function(k){ var m = /^av:([0-4]):([\s\S]*)$/.exec(k); if(m) avs[+m[1]].push(m[2]); });
@@ -2941,6 +2943,8 @@ function campForm(id){
       if(f.type === 'pct'){ if(o.v <= 0 || o.v > 100){ toast('Yüzde değeri 0 ile 100 arasında olmalı', 'err'); return false; } }
       else if(f.type === 'amt'){ if(o.v <= 0){ toast('İndirim tutarı girin', 'err'); return false; } }
       else if(f.type === 'price'){
+        if(f.scope !== 'prod'){ o.v = num(f.pv); if(!(o.v > 0)){ toast('Sabit kampanya fiyatını girin', 'err'); return false; } }
+        else {
         o.v = 0; o.prices = {};
         var stp = f.stype === 'wholesale' ? 'wholesale' : 'retail', badp = '';
         pids.forEach(function(id){
@@ -2951,6 +2955,7 @@ function campForm(id){
           else o.prices[id] = r2(cp);
         });
         if(badp){ toast(badp, 'err'); return false; }
+        }
       }
       else { o.v = 0; o.basket = f.basket !== '0'; o.buy = Math.floor(num(f.buy)); o.pay = Math.floor(num(f.pay)); if(o.buy < 2 || o.pay < 0 || o.pay >= o.buy){ toast('Örnek: 3 al 2 öde. Ödenen adet alınandan küçük olmalı.', 'err'); return false; } }
       o.stype = (f.stype === 'retail' || f.stype === 'wholesale') ? f.stype : '';
@@ -2961,8 +2966,8 @@ function campForm(id){
       if(o.scope === 'attr' && !o.av){ toast('En az bir özellik değeri seçin. Değer yoksa önce Özellikler sekmesinde tanımlayın.', 'err'); return false; }
       if(o.from && o.to && o.to < o.from){ toast('Bitiş tarihi başlangıçtan önce olamaz', 'err'); return false; }
       if(!o.stype) delete o.stype;
-      if(!o.minTotal) delete o.minTotal; if(o.type !== 'price') delete o.prices;
-      if(c){ Object.assign(c, o); if(!o.stype) delete c.stype; if(!o.minTotal) delete c.minTotal; if(o.type !== 'price') delete c.prices; if(o.scope !== 'prod') delete c.pids; if(o.scope !== 'attr') delete c.avs; if(o.aud !== 'cari'){ delete c.aud; delete c.cids; } } else { o.id = uid(); db.campaigns.push(o); }
+      if(!o.minTotal) delete o.minTotal; if(o.type !== 'price' || o.scope !== 'prod') delete o.prices;
+      if(c){ Object.assign(c, o); if(!o.stype) delete c.stype; if(!o.minTotal) delete c.minTotal; if(o.type !== 'price' || o.scope !== 'prod') delete c.prices; if(o.scope !== 'prod') delete c.pids; if(o.scope !== 'attr') delete c.avs; if(o.aud !== 'cari'){ delete c.aud; delete c.cids; } } else { o.id = uid(); db.campaigns.push(o); }
       commit(); toast('Kampanya kaydedildi');
     });
   campToggle();
