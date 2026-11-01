@@ -1,5 +1,11 @@
-[README.md](https://github.com/user-attachments/files/34050677/README.md)
+[README.md](https://github.com/user-attachments/files/34246666/README.md)
+<div align="center">
+  <img src="icon-192.png" alt="Stok ve Cari Takip logosu" width="110" />
+
 # 📦 Stok ve Cari Takip
+
+![PWA](https://img.shields.io/badge/PWA-Destekli-2456db) ![Dil](https://img.shields.io/badge/Dil-T%C3%BCrk%C3%A7e-2456db) ![Platform](https://img.shields.io/badge/Platform-Web%20%7C%20Mobil-2456db)
+</div>
 
 **Stok ve Cari Takip**, satış, alış, stok hareketleri ve cari hesap işlemlerini tek ekrandan yönetmeye yönelik Türkçe, mobil uyumlu bir web uygulamasıdır. **Progressive Web App (PWA)** desteğiyle uygun tarayıcılarda bilgisayar ve telefon ana ekranına eklenebilir; ilk çevrimiçi yüklemeden sonra uygulama kabuğu çevrimdışı da açılabilir.
 
@@ -7,14 +13,16 @@
 
 ## Özellikler
 
-- **Satış ve alış:** Satış/alış belgeleri, satış ve alış iadeleri, iskonto ve ödeme türleri.
-- **Ürün yönetimi:** Ürün kartları, barkodlar, renk/beden varyantları, özellikler ve toplu ürün aktarımı (CSV/Excel'den kopyalama).
+- **Satış ve alış:** Perakende ve toptan satış, ayrı belge serileri, satış/alış belgeleri, satış ve alış iadeleri, satır/genel iskonto ve ödeme türleri.
+- **Ürün yönetimi:** Ürün kartları, renk/beden varyantları, varyant bazlı barkodlar, ürün özellikleri ve Excel’den toplu ürün aktarımı.
+- **Kampanyalar:** Ürün veya özellik kapsamlı kampanyalar, yüzde/tutar indirimi, sabit fiyat ve çoklu alım kampanyaları; perakende/toptan veya seçili cari kapsamı.
 - **Stok takibi:** Stok giriş/çıkışları, stok hareketleri ve kritik stok takibi.
-- **Cari hesaplar:** Cari kartları, bakiyeler, ekstreler, tahsilat ve ödemeler.
+- **Cari hesaplar:** Cari kartları, perakende müşteri yönetimi, bakiyeler, ekstreler, tahsilat ve ödemeler.
 - **Döviz:** TRY, USD ve EUR işlemleri; yerel modda kur girişi elle yapılır.
 - **Raporlama:** Satış, alış, kasa, ödeme ve kârlılık yetkilerine bağlı raporlar.
 - **Kullanıcı yetkileri:** Yönetici ve kullanıcı bazlı menü/işlem izinleri; kasiyer, satış, depo ve muhasebe yetki şablonları.
-- **Etiket ve fiş:** EAN-13 barkod işlemleri, etiketler ve yazdırılabilir fişler.
+- **Etiket ve fiş:** EAN-13 otomatik barkod üretimi, eksik barkodları tamamlama, toplu etiket basımı ve yazdırılabilir fişler.
+- **Güvenlik ve hesap kurtarma:** Kullanıcıya özel yetkiler, şifre kurtarma kodu ve kayıt düzenleme izinleri.
 - **Görünüm:** Mobil uyumlu arayüz, açık/koyu tema ve PWA simgeleri.
 - **Yedekleme:** Yerel verilerin yedeklenmesi ve yedekten geri yüklenmesi.
 
@@ -30,6 +38,7 @@ stok-ve-cari-takip/
 ├── icon-maskable-512.png     # Android uyarlanabilir simge
 ├── apple-touch-icon.png      # iPhone/iPad ana ekran simgesi
 ├── favicon-32.png            # Tarayıcı sekmesi simgesi
+├── KURULUM.txt               # Ayrıntılı kurulum yönergeleri (isteğe bağlı)
 └── README.md                 # Bu doküman
 ```
 
@@ -110,4 +119,4 @@ Bu uygulamada ticari kayıtlar, cari bilgiler ve kullanıcı verileri tutulabili
 
 ---
 
-**Kaynak:** Bu README, sağlanan `index.html`, `manifest.webmanifest`, `sw.js`, simge dosyaları ve `KURULUM.txt` esas alınarak hazırlanmıştır.
+**Dokümantasyon:** Mevcut README düzeni korunarak uygulamanın güncel `index.html`, PWA dosyaları ve `KURULUM.txt` bilgilerine göre güncellenmiştir.
