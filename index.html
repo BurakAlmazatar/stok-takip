@@ -14,7 +14,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
-<script>try{var __t=localStorage.getItem('stokcari_theme');if(__t)document.documentElement.setAttribute('data-theme',__t);}catch(e){}</script>
+<script>try{var __t=localStorage.getItem('stokcari_theme');if(__t)document.documentElement.setAttribute('data-theme',__t);}catch(e){}try{if(/\.github\.io$/i.test(location.hostname)){var __g='Stok Cari - Github',__m=document.querySelector('meta[name="apple-mobile-web-app-title"]'),__n=document.querySelector('meta[name="application-name"]');if(__m)__m.setAttribute('content',__g);if(__n)__n.setAttribute('content',__g);}}catch(e){}</script>
 <style>
 :root{
   --bg:#eceff3;--surface:#ffffff;--surface-2:#f6f7f9;--text:#16202e;--muted:#667085;--border:#dde1e8;
@@ -238,7 +238,7 @@ label.f>input,label.f>select,label.f>textarea{margin-top:4px;font-weight:400}
 <script>
 /* ---------- Veri ---------- */
 var KEY = 'stokcari_v1';
-var APP_VERSION = '2026.10.25-18';
+var APP_VERSION = '2026.10.25-19';
 function defaults(){ return {products:[],caris:[],docs:[],payments:[],moves:[],counters:{sale:0,purchase:0},seq:1,users:[],campaigns:[],rates:[],settings:{name:'',phone:'',address:'',taxNo:'',footer:'',logo:'',logoRcpt:false,attrVals:[[],[],[],[],[]]}}; }
 function load(){
   try{ var s = localStorage.getItem(KEY); if(s){ var o = JSON.parse(s); return Object.assign(defaults(), o); } }catch(e){}
