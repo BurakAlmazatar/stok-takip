@@ -238,7 +238,7 @@ label.f>input,label.f>select,label.f>textarea{margin-top:4px;font-weight:400}
 <script>
 /* ---------- Veri ---------- */
 var KEY = 'stokcari_v1';
-var APP_VERSION = '2026.10.25-25';
+var APP_VERSION = '2026.10.25-26';
 function defaults(){ return {products:[],caris:[],docs:[],payments:[],moves:[],counters:{sale:0,purchase:0},seq:1,users:[],campaigns:[],rates:[],locs:[],transfers:[],settings:{name:'',phone:'',address:'',taxNo:'',footer:'',logo:'',logoRcpt:false,attrVals:[[],[],[],[],[]]}}; }
 function load(){
   try{ var s = localStorage.getItem(KEY); if(s){ var o = JSON.parse(s); return Object.assign(defaults(), o); } }catch(e){}
@@ -1750,6 +1750,7 @@ function stkInfo(ed, i){
     if(miss) return '<span class="neg">Önce ' + miss + ' seçin</span> <span class="muted">· Toplam stok: ' + qf(stockOf(p.id, edLoc(ed))) + unit + '</span>';
   }
   var st = hv ? stockV(p.id, l.cl, l.sz, edLoc(ed)) : stockOf(p.id, edLoc(ed)), sfx = hv ? ' (' + esc(varLabel(l.cl, l.sz)) + ')' : '';
+  if(ed.xfer && ed.xfer.editId) st = r2(st + xOldQty(ed.xfer.editId, l.pid, l.cl, l.sz));
   var need = sum(ed.lines.filter(function(x){ return vkey(x) === vkey(l); }), function(x){ return num(x.qty); });
   if(out && need > st + 0.0001) return '<span class="neg">Stok' + sfx + ': ' + qf(st) + unit + ' (çıkış bundan fazla, stok eksiye düşer)</span>';
   var after = r2(st + (out ? -need : need));
@@ -2594,7 +2595,7 @@ function stkScope(){ return myLoc() || (state.tab === 'stock' ? (state.sloc || '
 function edLoc(ed){ return ed.xfer ? ed.xfer.from : (ed.loc || myLoc() || 'merkez'); }                      // düzenleyicide stok kontrolünün yapıldığı lokasyon
 var XM = {sig:'', list:[]};
 function xferMoves(){
-  var ts = db.transfers || [], sg = ts.map(function(t){ return t.id + ':' + t.st + ':' + (t.rts || 0); }).join('|');
+  var ts = db.transfers || [], sg = ts.map(function(t){ return t.id + ':' + t.st + ':' + (t.rts || 0) + ':' + (t.fr || '') + ':' + (t.frts || 0) + ':' + (t.ets || 0) + ':' + (t.lines || []).length + ':' + xQty(t); }).join('|');
   if(sg === XM.sig) return XM.list;
   var out = [];
   ts.forEach(function(t){
@@ -2612,6 +2613,15 @@ function xferMoves(){
         out.push(r);
       }
     });
+    if(t.st === 'received' && t.fr === 'back'){                                 // eksik teslim gönderene iade edildi: fark, gönderen lokasyonun stoğuna geri eklenir
+      (t.lines || []).forEach(function(l, i){
+        var df = r2(num(l.qty) - num(l.rq)); if(df <= 0.0001) return;
+        var b = {id:'x:' + t.id + ':' + i + ':b', pid:l.pid, qty:df, date:t.frts ? ymd(new Date(t.frts)) : (t.rd || t.date), reason:xKindName(t) + ' eksik adet gönderene iade edildi', ref:t.id, no:t.no, note:'← ' + locName(t.to), ts:t.frts || t.rts || 0, xfer:true};
+        if(t.from !== 'merkez') b.loc = t.from;
+        if(l.cl) b.cl = l.cl; if(l.sz) b.sz = l.sz;
+        out.push(b);
+      });
+    }
   });
   XM = {sig:sg, list:out};
   return out;
@@ -2633,11 +2643,24 @@ function locRepSel(){
   return fld('Lokasyon', '<select data-rep="loc"><option value="">Tüm lokasyonlar</option>' + locsAll().map(function(l){ return '<option value="' + esc(l.id) + '"' + (r.loc === l.id ? ' selected' : '') + '>' + esc(l.name) + '</option>'; }).join('') + '</select>');
 }
 function storeCariNote(){ return myLoc() ? '<div class="muted" style="font-size:12px;margin:-4px 0 8px">Bakiyeler yalnızca bu mağazadaki hareketlere göre gösterilir (merkez devir bakiyeleri ve diğer lokasyonlar dahil değildir).</div>' : ''; }
+function xSender(t){ return can('xfer.send') && (isAdm() || (myLoc() ? myLoc() === t.from : t.from === 'merkez')); }
+function xReceiver(t){ return can('xfer.receive') && (isAdm() || (myLoc() ? myLoc() === t.to : t.to === 'merkez')); }
+function canEditX(t){ return t.st === 'sent' && xSender(t); }                                                  // teslim alınmamış transfer: gönderen düzenler
+function canDelX(t){ return ['sent', 'cancelled', 'rejected'].indexOf(t.st) >= 0 && xSender(t); }               // teslim alınmamış transfer: gönderen siler
+function canUnrcvX(t){ return t.st === 'received' && xReceiver(t); }                                            // teslim onayını alıcı kaldırır
+function xDiff(t){ return t.st === 'received' ? r2(xQty(t) - xGot(t)) : 0; }                                    // eksik teslim (gönderilen − teslim alınan)
+function canResX(t){ return t.st === 'received' && xDiff(t) > 0.0001 && can('xfer.send') && (isAdm() || !myLoc() || myLoc() === t.from); }
+function xOldQty(id, pid, cl, sz){ var t = (db.transfers || []).find(function(x){ return x.id === id; }); return t ? sum(t.lines.filter(function(l){ return l.pid === pid && nv(l.cl) === nv(cl) && nv(l.sz) === nv(sz); }), function(l){ return num(l.qty); }) : 0; }
+var XFR = {back:'Gönderene iade edildi', loss:'Zayiat / kayıp olarak kapatıldı'};
 function xf(){ if(!state.xf) state.xf = {st:'', q:'', loc:''}; return state.xf; }
 function xLineName(l){ var p = prod(l.pid); return (p ? p.name : '(silinmiş ürün)') + (l.cl || l.sz ? ' (' + varLabel(l.cl, l.sz) + ')' : ''); }
 function xferTag(t){
-  var cls = t.st === 'sent' ? 'warn' : t.st === 'received' ? 'move' : 'bad', diff = t.st === 'received' ? r2(xQty(t) - xGot(t)) : 0;
-  return '<span class="tag ' + cls + '">' + XST[t.st] + '</span>' + (diff > 0.0001 ? ' <span class="tag bad" title="Gönderilen ile teslim alınan arasındaki fark">fark ' + qf(diff) + '</span>' : '');
+  var cls = t.st === 'sent' ? 'warn' : t.st === 'received' ? 'move' : 'bad', df = xDiff(t), tx = '<span class="tag ' + cls + '">' + XST[t.st] + '</span>';
+  if(df > 0.0001){
+    if(!t.fr) tx += ' <span class="tag bad" title="Gönderilen ile teslim alınan arasındaki fark çözülmedi">askıda fark ' + qf(df) + '</span>';
+    else tx += ' <span class="tag ' + (t.fr === 'back' ? 'warn' : 'bad') + '">' + (t.fr === 'back' ? 'iade edildi (fark ' : 'zayiat (fark ') + qf(df) + ')</span>';
+  }
+  return tx + (t.eby ? ' <span class="muted" style="font-size:11px">düzenlendi</span>' : '');
 }
 function xferRowsHTML(){
   var f = xf(), q = nz(f.q);
@@ -2661,13 +2684,14 @@ V.xfer = function(){
     if(L){ if(nst >= 2) btns += '<button class="btn pri" data-act="newXfer" data-kind="str">+ Mağazaya transfer</button>'; btns += '<button class="btn' + (nst >= 2 ? '' : ' pri') + '" data-act="newXfer" data-kind="ret">+ Merkeze iade</button>'; }
     else if(isAdm() && hasStores()){ if(nst >= 2) btns += '<button class="btn" data-act="newXfer" data-kind="str">+ Mağazalar arası transfer</button>'; btns += '<button class="btn" data-act="newXfer" data-kind="ret">+ Mağaza iadesi (merkeze)</button>'; }
   }
-  var waiting = sent.filter(canRecvX);
+  var waiting = sent.filter(canRecvX), open0 = all.filter(function(t){ return xDiff(t) > 0.0001 && !t.fr; });
   return '<div class="bar"><h2>Transfer</h2><span class="spacer"></span>' + btns + '</div>' +
     '<div class="legend">' + (L ? 'Merkezden gelen transferleri <b>teslim alın</b>, fazla ya da eksik gelen malı teslim alırken adetle düzeltin. Satamadığınız veya iade edeceğiniz ürünleri <b>merkeze iade</b> olarak gönderin; başka bir mağazaya da doğrudan transfer gönderebilirsiniz (merkez onayı gerekmez). ' : 'Merkezden mağazalara mal gönderin; mağaza teslim alınca stok mağazaya geçer. Mağaza iadelerini de buradan teslim alırsınız. ') +
       'Yolda olan mal ne gönderen ne alan lokasyonun stoğunda görünür.</div>' +
     '<div class="grid">' +
       '<div class="stat"><div class="l">Yolda</div><div class="v">' + sent.length + '</div><div class="s">' + qf(sum(sent, xQty)) + ' adet</div></div>' +
       '<div class="stat' + (waiting.length ? ' sale' : '') + '"><div class="l">Teslim almanız gereken</div><div class="v">' + waiting.length + '</div><div class="s">' + qf(sum(waiting, xQty)) + ' adet</div></div>' +
+      (open0.length ? '<div class="stat"><div class="l">Askıda fark (çözülmemiş eksik teslim)</div><div class="v neg">' + qf(sum(open0, xDiff)) + '</div><div class="s">' + open0.length + ' transfer</div></div>' : '') +
     '</div>' +
     '<div class="card"><div class="cols">' +
       fld('Durum', '<select data-xf="st"><option value="">Hepsi</option>' + ['sent', 'received', 'cancelled', 'rejected'].map(function(k){ return '<option value="' + k + '"' + (f.st === k ? ' selected' : '') + '>' + XST[k] + '</option>'; }).join('') + '</select>') +
@@ -2678,13 +2702,13 @@ V.xfer = function(){
 function xferEditorHTML(ed, lines){
   var x = ed.xfer, ret = x.kind === 'ret', str = x.kind === 'str', stores = locsAll(true).filter(function(l){ return l.id !== 'merkez'; });
   var storeSel = function(f, label, val, skip, empty){ return fld(label, '<select data-ed="stock" data-f="' + f + '">' + (empty ? '<option value="">Mağaza seçin</option>' : '') + stores.filter(function(l){ return l.id !== skip; }).map(function(l){ return '<option value="' + esc(l.id) + '"' + (val === l.id ? ' selected' : '') + '>' + esc(l.name) + '</option>'; }).join('') + '</select>'); };
-  var chooseFrom = !myLoc();                                  // merkez/yönetici bir mağaza adına girerken gönderen mağaza seçilir
+  var chooseFrom = !myLoc() && !x.editId;                                  // merkez/yönetici bir mağaza adına girerken gönderen mağaza seçilir
   var fromBox = chooseFrom ? storeSel('xfrom', 'Gönderen mağaza', x.from, '', false) : fld('Gönderen', '<input value="' + esc(locName(x.from)) + '" disabled>');
   var from, to;
   if(ret){ from = fromBox; to = fld('Alan', '<input value="Merkez" disabled>'); }
   else if(str){ from = fromBox; to = storeSel('xto', 'Hedef mağaza', x.to, x.from, true); }
   else { from = fld('Gönderen', '<input value="Merkez" disabled>'); to = storeSel('xto', 'Hedef mağaza', x.to, '', true); }
-  return '<div class="bar"><h2>' + (ret ? 'Merkeze iade' : str ? 'Mağazalar arası transfer' : 'Mağazaya transfer') + '</h2></div>' +
+  return '<div class="bar"><h2>' + (x.editId ? esc(x.editNo) + ' · transferi düzenle' : (ret ? 'Merkeze iade' : str ? 'Mağazalar arası transfer' : 'Mağazaya transfer')) + '</h2></div>' +
     '<div class="hint">' + (ret ? 'Merkeze geri göndereceğiniz ürünleri ekleyin. Merkez teslim alınca stok merkeze geçer.' : str ? 'Başka bir mağazaya göndereceğiniz ürünleri (renk/beden dahil) ekleyin. Gönderince gönderen mağazanın stoğundan düşer; alan mağaza teslim alınca onun stoğuna eklenir. Merkez onayı gerekmez.' : 'Mağazaya göndereceğiniz ürünleri (renk/beden dahil) ekleyin. Gönderince merkez stoğundan düşer; mağaza teslim alınca mağaza stoğuna eklenir.') + ' Barkod okutarak da ekleyebilirsiniz.</div>' +
     '<div class="card"><div class="cols">' + from + to + fld('Tarih', '<input type="date" value="' + esc(ed.date) + '" data-ed="stock" data-f="date">') + '</div>' +
     '<h3>Ürünler</h3><div class="scanrow"><input id="scan" data-scan="stock" placeholder="Barkod okutun veya kodu yazıp Enter’a basın" autocomplete="off"></div>' +
@@ -2692,33 +2716,46 @@ function xferEditorHTML(ed, lines){
     '<div style="margin-top:10px"><button type="button" class="btn sm" data-act="addLine" data-type="stock">+ Satır ekle</button></div>' +
     '<div class="totals"><div><div class="muted">Toplam miktar</div><div class="big" id="stk_tot">' + qf(stkTotal(ed)) + '</div></div></div>' +
     '<div style="margin-top:12px">' + fld('Not', '<input type="text" value="' + esc(ed.note) + '" data-ed="stock" data-f="note" placeholder="İsteğe bağlı (araç plakası, koli sayısı…)">') + '</div>' +
-    '<div class="row-end"><button class="btn" data-act="cancelStock">Vazgeç</button><button class="btn pri" data-act="saveXfer">Transferi gönder</button></div></div>';
+    '<div class="row-end"><button class="btn" data-act="cancelStock">Vazgeç</button><button class="btn pri" data-act="saveXfer">' + (x.editId ? 'Değişiklikleri kaydet' : 'Transferi gönder') + '</button></div></div>';
 }
-function rcptXfer(t){
-  var rc = rcOpt(), h = rcptHead(t.kind === 'ret' ? 'Mağaza iadesi / sevk fişi' : t.kind === 'str' ? 'Mağazalar arası transfer / sevk fişi' : 'Transfer / sevk fişi', t.no, t.date);
+function xrcLines(lines, mode){                                // transfer fişi satırları: detay / ürün + renk / ürün bazında toplama
+  var out = [], idx = {};
+  lines.forEach(function(l){
+    var key = mode === 'product' ? l.pid : mode === 'color' ? l.pid + '|' + nv(l.cl) : null;
+    var o = (key !== null && idx[key] !== undefined) ? out[idx[key]] : null;
+    if(!o){ o = {pid:l.pid, cl:mode === 'product' ? '' : l.cl, sz:(mode === 'product' || mode === 'color') ? '' : l.sz, qty:0, rq:0}; if(key !== null) idx[key] = out.length; out.push(o); }
+    o.qty = r2(o.qty + num(l.qty)); o.rq = r2(o.rq + num(l.rq));
+  });
+  return out;
+}
+function rcptXfer(t, g){
+  var rc = rcOpt(), mode = (g === 'product' || g === 'color' || g === 'detail') ? g : rc.xgroup, df = xDiff(t);
+  var h = rcptHead(t.kind === 'ret' ? 'Mağaza iadesi / sevk fişi' : t.kind === 'str' ? 'Mağazalar arası transfer / sevk fişi' : 'Transfer / sevk fişi', t.no, t.date);
   h += '<div class="rr"><span>Gönderen</span><span>' + esc(locName(t.from)) + '</span></div><div class="rr"><span>Alan</span><span>' + esc(locName(t.to)) + '</span></div><div class="rr"><span>Durum</span><span>' + XST[t.st] + '</span></div>';
   if(t.by && rc.user) h += '<div class="rr"><span>Gönderen kullanıcı</span><span>' + esc(userName(t.by)) + '</span></div>';
   h += '<hr>';
-  t.lines.forEach(function(l){
-    var p = prod(l.pid);
-    h += '<div>' + esc(xLineName(l)) + '</div><div class="rr"><span>Gönderilen</span><span>' + qf(l.qty) + ' ' + esc(p ? p.unit : '') + '</span></div>';
-    if(t.st === 'received') h += '<div class="rr"><span>Teslim alınan</span><span>' + qf(l.rq) + ' ' + esc(p ? p.unit : '') + '</span></div>';
+  xrcLines(t.lines, mode).forEach(function(o){
+    var p = prod(o.pid), vl = varLabel(o.cl, o.sz), d0 = t.st === 'received' ? r2(o.qty - o.rq) : 0;
+    h += '<div>' + esc(p ? p.name : '(silinmiş ürün)') + (vl ? ' (' + esc(vl) + ')' : '') + '</div><div class="rr"><span>Gönderilen</span><span>' + qf(o.qty) + ' ' + esc(p ? p.unit : '') + '</span></div>';
+    if(t.st === 'received'){ h += '<div class="rr"><span>Teslim alınan</span><span>' + qf(o.rq) + ' ' + esc(p ? p.unit : '') + '</span></div>'; if(d0 > 0.0001) h += '<div class="rr"><span>&nbsp;&nbsp;Fark (eksik)</span><span>' + qf(d0) + '</span></div>'; }
   });
   h += '<hr><div class="rr b"><span>TOPLAM GÖNDERİLEN</span><span>' + qf(xQty(t)) + '</span></div>';
   if(t.st === 'received') h += '<div class="rr b"><span>TOPLAM TESLİM ALINAN</span><span>' + qf(xGot(t)) + '</span></div>';
+  if(df > 0.0001) h += '<div class="rr"><span>Eksik teslim: ' + qf(df) + ' adet</span><span>' + (t.fr ? XFR[t.fr] : 'çözüm bekliyor') + '</span></div>';
   if(t.note) h += '<div>' + esc(t.note) + '</div>';
   if(t.rnote) h += '<div>Teslim notu: ' + esc(t.rnote) + '</div>';
   h += '<div class="rr" style="margin-top:22px"><span>Teslim eden: ________</span><span>Teslim alan: ________</span></div>';
   return h + rcptFoot('sale');
 }
 function xferDetailHTML(t){
-  var got = t.st === 'received';
-  return '<div class="hint"><b>' + esc(t.no) + '</b> · ' + fd(t.date) + ' · ' + esc(locName(t.from)) + ' → ' + esc(locName(t.to)) + (t.kind === 'ret' ? ' · mağaza iadesi' : t.kind === 'str' ? ' · mağazalar arası' : '') + '<br>Durum: ' + xferTag(t) + (t.by ? ' · Gönderen: ' + esc(userName(t.by)) : '') + (t.rby ? ' · ' + (t.st === 'received' ? 'Teslim alan: ' : 'İşlemi yapan: ') + esc(userName(t.rby)) + (t.rd ? ' (' + fd(t.rd) + ')' : '') : '') + '</div>' +
+  var got = t.st === 'received', df = xDiff(t);
+  return '<div class="hint"><b>' + esc(t.no) + '</b> · ' + fd(t.date) + ' · ' + esc(locName(t.from)) + ' → ' + esc(locName(t.to)) + (t.kind === 'ret' ? ' · mağaza iadesi' : t.kind === 'str' ? ' · mağazalar arası' : '') + '<br>Durum: ' + xferTag(t) + (t.by ? ' · Gönderen: ' + esc(userName(t.by)) : '') + (t.rby ? ' · ' + (got ? 'Teslim alan: ' : 'İşlemi yapan: ') + esc(userName(t.rby)) + (t.rd ? ' (' + fd(t.rd) + ')' : '') : '') + (t.eby ? '<br>Düzenleyen: ' + esc(userName(t.eby)) + (t.ets ? ' (' + fd(ymd(new Date(t.ets))) + ')' : '') : '') + '</div>' +
     '<div class="tbl"><table><thead><tr><th>Ürün</th><th class="r">Gönderilen</th>' + (got ? '<th class="r">Teslim alınan</th>' : '') + '</tr></thead><tbody>' + t.lines.map(function(l){
-      var p = prod(l.pid), diff = got ? r2(num(l.qty) - num(l.rq)) : 0;
-      return '<tr><td>' + esc(xLineName(l)) + '</td><td class="r">' + qf(l.qty) + ' ' + esc(p ? p.unit : '') + '</td>' + (got ? '<td class="r' + (diff > 0.0001 ? ' neg' : '') + '">' + qf(l.rq) + (diff > 0.0001 ? ' <span class="muted">(eksik ' + qf(diff) + ')</span>' : '') + '</td>' : '') + '</tr>';
+      var p = prod(l.pid), d0 = got ? r2(num(l.qty) - num(l.rq)) : 0;
+      return '<tr><td>' + esc(xLineName(l)) + '</td><td class="r">' + qf(l.qty) + ' ' + esc(p ? p.unit : '') + '</td>' + (got ? '<td class="r' + (d0 > 0.0001 ? ' neg' : '') + '">' + qf(l.rq) + (d0 > 0.0001 ? ' <span class="muted">(eksik ' + qf(d0) + ')</span>' : '') + '</td>' : '') + '</tr>';
     }).join('') + '</tbody></table></div>' +
-    (t.note ? '<div class="muted" style="margin-top:6px">Not: ' + esc(t.note) + '</div>' : '') + (t.rnote ? '<div class="muted">' + (t.st === 'received' ? 'Teslim notu: ' : 'Açıklama: ') + esc(t.rnote) + '</div>' : '');
+    (df > 0.0001 ? '<div class="hint" style="margin-top:8px"><b>Eksik teslim: ' + qf(df) + ' adet.</b> ' + (t.fr ? XFR[t.fr] + (t.frby ? ' · ' + esc(userName(t.frby)) : '') + (t.frnote ? ' · ' + esc(t.frnote) : '') + (t.fr === 'back' ? ' (adet gönderen lokasyonun stoğuna geri eklendi).' : ' (adet hiçbir lokasyonun stoğunda yer almaz).') : 'Henüz çözülmedi: adet şu an hiçbir lokasyonun stoğunda görünmüyor. Gönderen taraf “Eksiği çöz” ile gönderene iade edebilir veya zayiat olarak kapatabilir; ya da alıcı teslim onayını kaldırıp doğru adetle yeniden onaylayabilir.') + '</div>' : '') +
+    (t.note ? '<div class="muted" style="margin-top:6px">Not: ' + esc(t.note) + '</div>' : '') + (t.rnote ? '<div class="muted">' + (got ? 'Teslim notu: ' : 'Açıklama: ') + esc(t.rnote) + '</div>' : '');
 }
 function locCard(){
   var rows = locsAll().map(function(l){
@@ -3225,11 +3262,58 @@ A.rxExport = async function(d){
 A.slocSet = function(d){ state.sloc = d.l || ''; render(); };
 A.openXfer = function(d){
   var t = (db.transfers || []).find(function(x){ return x.id === d.id; }); if(!t) return;
-  var ex = '';
-  if(canRecvX(t)) ex += '<button type="button" class="btn pri" data-act="rcvXfer" data-id="' + t.id + '">Teslim al</button><button type="button" class="btn danger" data-act="xferAct" data-id="' + t.id + '" data-a="reject">Reddet</button>';
-  if(canSendX(t)) ex += '<button type="button" class="btn danger" data-act="xferAct" data-id="' + t.id + '" data-a="cancel">İptal et</button>';
+  var ex = '', b = function(act, cls, label, extra){ return '<button type="button" class="btn ' + cls + '" data-act="' + act + '" data-id="' + t.id + '"' + (extra || '') + '>' + label + '</button>'; };
+  if(canRecvX(t)) ex += b('rcvXfer', 'pri', 'Teslim al') + b('xferAct', 'danger', 'Reddet', ' data-a="reject"');
+  if(canEditX(t)) ex += b('editXfer', '', 'Düzenle');
+  if(canSendX(t)) ex += b('xferAct', 'danger', 'İptal et', ' data-a="cancel"');
+  if(canDelX(t)) ex += b('delXfer', 'danger', 'Sil');
+  if(canUnrcvX(t)) ex += b('unrcvXfer', '', 'Teslim onayını kaldır');
+  if(canResX(t)) ex += t.fr ? b('reopenXfer', '', 'Çözümü geri al') : b('resXfer', 'pri', 'Eksiği çöz');
   ex += '<button type="button" class="btn" data-act="receipt" data-kind="xfer" data-id="' + t.id + '">Fiş yazdır</button>';
   modal('Transfer ' + t.no, xferDetailHTML(t), null, null, ex);
+};
+A.editXfer = function(d){
+  var t = (db.transfers || []).find(function(x){ return x.id === d.id; });
+  if(!t || !canEditX(t)){ toast('Bu transfer düzenlenemez (teslim alınmış olabilir)', 'err'); return; }
+  closeModal();
+  state.ed.stock = {dir:'out', xfer:{kind:t.kind, from:t.from, to:t.to, editId:t.id, editNo:t.no}, date:t.date, reason:'', note:t.note || '', lines:t.lines.map(function(l){ return {pid:l.pid, qty:l.qty, cl:l.cl || '', sz:l.sz || ''}; })};
+  state.tab = 'xfer'; render(); window.scrollTo(0, 0);
+};
+A.delXfer = function(d){
+  var t = (db.transfers || []).find(function(x){ return x.id === d.id; });
+  if(!t || !canDelX(t)){ toast('Bu transfer silinemez (teslim alınmışsa önce teslim onayını kaldırın)', 'err'); return; }
+  if(lockGuard(t.date)) return;
+  confirmBox('Transfer ' + t.no + ' silinecek' + (t.st === 'sent' ? '; gönderilen mal gönderen lokasyonun stoğuna geri döner.' : '.'), function(){ db.transfers = db.transfers.filter(function(x){ return x.id !== t.id; }); closeModal(); commit(); toast('Transfer silindi'); });
+};
+A.unrcvXfer = function(d){
+  var t = (db.transfers || []).find(function(x){ return x.id === d.id; });
+  if(!t || !canUnrcvX(t)){ toast('Bu işlem için yetkiniz yok', 'err'); return; }
+  if(lockGuard(t.rd || t.date)) return;
+  var neg = [];
+  t.lines.forEach(function(l){ var p = prod(l.pid); if(!p) return; var st = (hasVar(p) ? stockV(l.pid, l.cl, l.sz, t.to) : stockOf(l.pid, t.to)) - num(l.rq); if(st < -0.0001) neg.push(xLineName(l) + ' (' + qf(st) + ')'); });
+  confirmBox('Transfer ' + t.no + ' teslim onayı kaldırılacak: teslim alınan miktarlar silinir, transfer yeniden “Yolda” olur, ' + locName(t.to) + ' stoğundan düşülür' + (t.fr ? ' ve eksik teslim çözümü de iptal olur' : '') + '.' + (neg.length ? ' Dikkat: bu ürünlerin stoğu eksiye düşer: ' + neg.slice(0, 3).join(', ') + (neg.length > 3 ? ' …' : '') + '.' : ''), function(){
+    t.st = 'sent'; ['rby', 'rts', 'rd', 'rnote', 'fr', 'frby', 'frts', 'frnote'].forEach(function(k){ delete t[k]; });
+    t.lines.forEach(function(l){ delete l.rq; });
+    closeModal(); commit(); toast('Teslim onayı kaldırıldı'); A.openXfer({id:t.id});
+  }, 'Onayı kaldır');
+};
+A.resXfer = function(d){
+  var t = (db.transfers || []).find(function(x){ return x.id === d.id; });
+  if(!t || !canResX(t) || t.fr){ toast('Bu işlem için yetkiniz yok', 'err'); return; }
+  modal('Eksik teslim · ' + t.no,
+    '<div class="hint"><b>' + qf(xDiff(t)) + ' adet</b> eksik teslim edildi (' + esc(locName(t.from)) + ' → ' + esc(locName(t.to)) + '). Şu an bu adet hiçbir lokasyonun stoğunda görünmüyor. Ne yapılsın?</div>' +
+    fld('Çözüm', '<select name="fr"><option value="back">Gönderene iade et — adet ' + esc(locName(t.from)) + ' stoğuna geri eklenir</option><option value="loss">Zayiat / kayıp olarak kapat — adet hiçbir stokta yer almaz</option></select>') + fld('Açıklama (isteğe bağlı)', '<textarea name="frnote" rows="2"></textarea>'),
+    function(f){
+      if(lockGuard(today())) return false;
+      t.fr = f.fr === 'loss' ? 'loss' : 'back'; t.frby = (cur() || {}).id || ''; t.frts = Date.now();
+      var n = String(f.frnote || '').trim(); if(n) t.frnote = n; else delete t.frnote;
+      commit(); toast(t.fr === 'back' ? 'Eksik adet gönderene iade edildi' : 'Eksik adet zayiat olarak kapatıldı');
+    }, 'Kaydet');
+};
+A.reopenXfer = function(d){
+  var t = (db.transfers || []).find(function(x){ return x.id === d.id; });
+  if(!t || !canResX(t) || !t.fr){ toast('Bu işlem için yetkiniz yok', 'err'); return; }
+  confirmBox('Eksik teslim çözümü geri alınacak; adet yeniden “askıda” olur.', function(){ ['fr', 'frby', 'frts', 'frnote'].forEach(function(k){ delete t[k]; }); closeModal(); commit(); toast('Çözüm geri alındı'); });
 };
 A.rcvXfer = function(d){
   var t = (db.transfers || []).find(function(x){ return x.id === d.id; });
@@ -3303,10 +3387,21 @@ A.saveXfer = async function(d){
   r.items.forEach(function(it){ var k = vkey({pid:it.p.id, cl:it.cl, sz:it.sz}); need[k] = need[k] || {it:it, q:0}; need[k].q += it.q; });
   Object.keys(need).forEach(function(k){
     var it = need[k].it, st = hasVar(it.p) ? stockV(it.p.id, it.cl, it.sz, x.from) : stockOf(it.p.id, x.from);
+    if(x.editId) st = r2(st + xOldQty(x.editId, it.p.id, it.cl, it.sz));                 // düzenlenen transferin kendi çıkışı geri sayılır
     if(need[k].q > st + 0.0001) miss.push(it.p.name + (it.cl || it.sz ? ' (' + varLabel(it.cl, it.sz) + ')' : '') + ': stok ' + qf(st) + ', gönderilen ' + qf(need[k].q));
   });
   if(miss.length && !(d && d.force)){
     confirmBox(locName(x.from) + ' stoğu yetersiz: ' + miss.slice(0, 3).join('; ') + (miss.length > 3 ? ' …' : '') + '. Yine de gönderilsin mi?', function(){ A.saveXfer({force:'1'}); }, 'Yine de gönder');
+    return;
+  }
+  if(x.editId){
+    var et = (db.transfers || []).find(function(t){ return t.id === x.editId; });
+    if(!et || !canEditX(et)){ toast('Bu transfer düzenlenemez (teslim alınmış olabilir)', 'err'); return; }
+    if(lockGuard(et.date)) return;
+    et.to = x.to; et.date = ed.date || today(); et.note = String(ed.note || '').trim();
+    et.lines = r.items.map(function(it){ var l = {pid:it.p.id, qty:it.q}; if(it.cl) l.cl = it.cl; if(it.sz) l.sz = it.sz; return l; });
+    et.eby = (cur() || {}).id || ''; et.ets = Date.now();
+    state.ed.stock = null; commit(); toast('Transfer güncellendi · ' + et.no); A.openXfer({id:et.id});
     return;
   }
   var no;
@@ -4503,7 +4598,7 @@ function rcCard(){
   return '<div class="card"><h3>Fiş tasarımı</h3><p class="muted" style="margin-top:0">Fişte hangi bilgilerin görüneceğini, fiş başlıklarını ve her işlem türü için ayrı alt notu belirleyin. Alt notlar standart olarak boştur. Sonucu görmek için bir işlemin fişini açabilirsiniz.</p>' +
     '<div class="pgrp" style="margin-bottom:12px"><div class="pgt">Ürün satırları</div>' +
       fld('Renk / beden gruplama', '<select id="rc_group"><option value="detail"' + (o.group === 'detail' ? ' selected' : '') + '>Renk ve beden detaylı (her renk/beden ayrı satır)</option><option value="color"' + (o.group === 'color' ? ' selected' : '') + '>Ürün ve renk bazında (bedenler tek satırda toplanır)</option><option value="product"' + (o.group === 'product' ? ' selected' : '') + '>Ürün bazında (renk ve bedenler tek satırda toplanır)</option></select>') +
-      '<div class="muted" style="font-size:12px">Toplanan satırda adetler toplanır, tutar ve indirimler birleşir. Belge toplamları, KDV dökümü ve stok değişmez; yalnızca fişin görünümü etkilenir.</div></div>' +
+      fld('Transfer fişi satırları', '<select id="rc_xgroup"><option value="detail"' + (o.xgroup === 'detail' ? ' selected' : '') + '>Renk ve beden detaylı (her renk/beden ayrı satır)</option><option value="color"' + (o.xgroup === 'color' ? ' selected' : '') + '>Ürün ve renk bazında (bedenler tek satırda toplanır)</option><option value="product"' + (o.xgroup === 'product' ? ' selected' : '') + '>Ürün bazında (renk ve bedenler tek satırda toplanır)</option></select>') + '<div class="muted" style="font-size:12px">Toplanan satırda adetler toplanır, tutar ve indirimler birleşir. Belge toplamları, KDV dökümü ve stok değişmez; yalnızca fişin görünümü etkilenir.</div></div>' +
     '<div class="pgrp" style="margin-bottom:12px"><div class="pgt">Fişte gösterilecek bilgiler</div><div class="permgrid">' +
       chk('addr', 'Adres') + chk('phone', 'Telefon') + chk('tax', 'Vergi dairesi / no') + chk('cari', 'Cari adı') + chk('user', 'İşlemi yapan kullanıcı') + chk('vat', 'KDV dökümü (KDV hariç ve oranlara göre KDV)') + chk('pays', 'Ödeme yöntemi satırları') + chk('disc', '“… indirim kazandınız” özeti (satışta)') + chk('notice', '“Bilgi fişidir, mali değeri yoktur” uyarısı') +
     '</div></div>' +
@@ -4516,6 +4611,7 @@ A.saveRc = function(){
   var o = {titles:{}, foot:{}};
   document.querySelectorAll('[data-rc]').forEach(function(cb){ o[cb.dataset.rc] = cb.checked; });
   var gv = $('#rc_group') ? $('#rc_group').value : 'detail'; o.group = (gv === 'product' || gv === 'color') ? gv : 'detail';
+  var xv = $('#rc_xgroup') ? $('#rc_xgroup').value : 'detail'; o.xgroup = (xv === 'product' || xv === 'color') ? xv : 'detail';
   Object.keys(RC_TITLES).forEach(function(k){
     o.titles[k] = (($('#rc_t_' + k).value || '').trim()) || RC_TITLES[k];
     o.foot[k] = ($('#rc_f_' + k).value || '').replace(/\s+$/, '');
@@ -4873,8 +4969,9 @@ A.copyPay = function(){
 var RC_TITLES = {sale:'Satış fişi', purchase:'Alış fişi', sret:'Satış iadesi fişi', pret:'Alış iadesi fişi', 'in':'Tahsilat makbuzu', out:'Ödeme makbuzu'};
 function rcOpt(){
   var st = db.settings || {}, r = st.rc || {};
-  var o = {addr:true, phone:true, tax:true, cari:true, user:true, vat:true, pays:true, disc:true, notice:true, group:'detail', titles:{}, foot:{}};
+  var o = {addr:true, phone:true, tax:true, cari:true, user:true, vat:true, pays:true, disc:true, notice:true, group:'detail', xgroup:'detail', titles:{}, foot:{}};
   if(r.group === 'product' || r.group === 'color') o.group = r.group;
+  if(r.xgroup === 'product' || r.xgroup === 'color') o.xgroup = r.xgroup;
   ['addr', 'phone', 'tax', 'cari', 'user', 'vat', 'pays', 'disc', 'notice'].forEach(function(k){ if(typeof r[k] === 'boolean') o[k] = r[k]; });
   Object.keys(RC_TITLES).forEach(function(k){
     o.titles[k] = (r.titles && r.titles[k]) ? r.titles[k] : RC_TITLES[k];
@@ -4988,21 +5085,23 @@ function rcptPay(p){
 }
 var lastRcpt = null;
 A.receipt = function(d){
-  var html, name;
+  var html, name, xex = '';
   if(d.kind === 'pay'){
     var p = db.payments.find(function(y){ return y.id === d.id; }); if(!p) return;
     if(!can('payments.view')){ toast('Bu işlem için yetkiniz yok', 'err'); return; }
     html = rcptPay(p); name = 'makbuz-' + p.date;
   } else if(d.kind === 'xfer'){
     var tx = (db.transfers || []).find(function(y){ return y.id === d.id; }); if(!tx) return;
-    html = rcptXfer(tx); name = 'transfer-' + tx.no;
+    var xg = (d.g === 'product' || d.g === 'color' || d.g === 'detail') ? d.g : rcOpt().xgroup;
+    html = rcptXfer(tx, xg); name = 'transfer-' + tx.no;
+    xex = [['detail', 'Renk/beden detaylı'], ['color', 'Ürün + renk'], ['product', 'Ürün bazında']].map(function(k){ return '<button type="button" class="btn sm' + (xg === k[0] ? ' pri' : '') + '" data-act="receipt" data-kind="xfer" data-id="' + tx.id + '" data-g="' + k[0] + '">' + k[1] + '</button>'; }).join('');
   } else {
     var x = db.docs.find(function(y){ return y.id === d.id; }); if(!x) return;
     if(!can(DOC_VIEW[x.type])){ toast('Bu işlem için yetkiniz yok', 'err'); return; }
     html = rcptDoc(x); name = 'fis-' + x.no;
   }
   lastRcpt = {html:html, name:name};
-  modal('Fiş', html, null, null, '<button type="button" class="btn" data-act="saveRcpt">Dosya olarak kaydet</button><button type="button" class="btn pri" data-act="printRcpt">Yazdır</button>');
+  modal('Fiş', html, null, null, xex + '<button type="button" class="btn" data-act="saveRcpt">Dosya olarak kaydet</button><button type="button" class="btn pri" data-act="printRcpt">Yazdır</button>');
 };
 A.printRcpt = function(){
   var pg = document.getElementById('pgstyle');
