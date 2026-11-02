@@ -238,7 +238,7 @@ label.f>input,label.f>select,label.f>textarea{margin-top:4px;font-weight:400}
 <script>
 /* ---------- Veri ---------- */
 var KEY = 'stokcari_v1';
-var APP_VERSION = '2026.10.25-26';
+var APP_VERSION = '2026.10.25-28';
 function defaults(){ return {products:[],caris:[],docs:[],payments:[],moves:[],counters:{sale:0,purchase:0},seq:1,users:[],campaigns:[],rates:[],locs:[],transfers:[],settings:{name:'',phone:'',address:'',taxNo:'',footer:'',logo:'',logoRcpt:false,attrVals:[[],[],[],[],[]]}}; }
 function load(){
   try{ var s = localStorage.getItem(KEY); if(s){ var o = JSON.parse(s); return Object.assign(defaults(), o); } }catch(e){}
@@ -621,7 +621,7 @@ function render(){
     if(!ft){ $('#app').innerHTML = '<div class="card login"><h2>Yetki yok</h2><p class="muted">Bu hesaba hiçbir menü için yetki verilmemiş. Lütfen yöneticinizle görüşün.</p><button class="btn" data-act="logout">Oturumu kapat</button></div>'; return; }
     state.tab = ft[0];
   }
-  $('#app').innerHTML = V[state.tab]();
+  $('#app').innerHTML = srvBanner() + V[state.tab]();
   if(state.tab === 'settings') lbWarn();
 }
 
@@ -2580,6 +2580,17 @@ function rxFileName(t, ext){
 /* Merkez sabittir (kimlik "merkez"). Mağazalar db.locs içinde tutulur. Kayıtlarda lokasyon yoksa "merkez" sayılır.
    Transferler db.transfers içinde durur; stok etkileri "sanal stok hareketi" olarak hesaplanır (xferMoves): gönderilen mal gönderen lokasyondan
    düşer, yolda iken hiçbir lokasyonda sayılmaz, teslim alınınca (teslim alınan miktar kadar) alan lokasyona eklenir. */
+/* Sunucu sürümü kontrolü: sunucu klasörü güncellenmemişse (eski sunucu build bilgisi göndermez) yeni özellikler hata verir; kullanıcı uyarılır. */
+function verCmp(a, b){
+  var x = String(a || '').split(/[.\-]/).map(Number), y = String(b || '').split(/[.\-]/).map(Number);
+  for(var i = 0; i < Math.max(x.length, y.length); i++){ var d = (x[i] || 0) - (y[i] || 0); if(d) return d < 0 ? -1 : 1; }
+  return 0;
+}
+function srvOutdated(){ return !!SRV && sync.build !== undefined && verCmp(sync.build || '0', APP_VERSION) < 0; }
+function srvBanner(){
+  if(!srvOutdated()) return '';
+  return '<div class="hint" style="border-color:#c0392b;background:rgba(192,57,43,.1)"><b>Sunucu güncel değil.</b> Sunucu sürümü: ' + esc(sync.build || 'eski (sürüm bilgisi yok)') + ', uygulama sürümü: ' + esc(APP_VERSION) + '. Yeni özellikler hata verebilir (örn. “… değiştirilemez. Değişiklik geri alındı.”). Sunucu klasöründeki <b>tüm dosyaları</b> (server.js ve src klasörü dahil) yeni sürümle değiştirip sunucuyu yeniden başlatın.</div>';
+}
 function locOn(){ return !!SRV; }                              // merkez / mağaza yapısı yalnızca sunucu sürümünde çalışır
 function isAdm(){ var u = cur(); return !!u && u.role === 'admin'; }
 function myLoc(){ if(!locOn()) return ''; var u = cur(); return (u && u.role !== 'admin' && u.loc && u.loc !== 'merkez') ? u.loc : ''; }       // mağaza kullanıcısı: kendi lokasyonu; merkez ve yönetici: boş (hepsi)
@@ -4598,7 +4609,7 @@ function rcCard(){
   return '<div class="card"><h3>Fiş tasarımı</h3><p class="muted" style="margin-top:0">Fişte hangi bilgilerin görüneceğini, fiş başlıklarını ve her işlem türü için ayrı alt notu belirleyin. Alt notlar standart olarak boştur. Sonucu görmek için bir işlemin fişini açabilirsiniz.</p>' +
     '<div class="pgrp" style="margin-bottom:12px"><div class="pgt">Ürün satırları</div>' +
       fld('Renk / beden gruplama', '<select id="rc_group"><option value="detail"' + (o.group === 'detail' ? ' selected' : '') + '>Renk ve beden detaylı (her renk/beden ayrı satır)</option><option value="color"' + (o.group === 'color' ? ' selected' : '') + '>Ürün ve renk bazında (bedenler tek satırda toplanır)</option><option value="product"' + (o.group === 'product' ? ' selected' : '') + '>Ürün bazında (renk ve bedenler tek satırda toplanır)</option></select>') +
-      fld('Transfer fişi satırları', '<select id="rc_xgroup"><option value="detail"' + (o.xgroup === 'detail' ? ' selected' : '') + '>Renk ve beden detaylı (her renk/beden ayrı satır)</option><option value="color"' + (o.xgroup === 'color' ? ' selected' : '') + '>Ürün ve renk bazında (bedenler tek satırda toplanır)</option><option value="product"' + (o.xgroup === 'product' ? ' selected' : '') + '>Ürün bazında (renk ve bedenler tek satırda toplanır)</option></select>') + '<div class="muted" style="font-size:12px">Toplanan satırda adetler toplanır, tutar ve indirimler birleşir. Belge toplamları, KDV dökümü ve stok değişmez; yalnızca fişin görünümü etkilenir.</div></div>' +
+      (locOn() ? fld('Transfer fişi satırları', '<select id="rc_xgroup"><option value="detail"' + (o.xgroup === 'detail' ? ' selected' : '') + '>Renk ve beden detaylı (her renk/beden ayrı satır)</option><option value="color"' + (o.xgroup === 'color' ? ' selected' : '') + '>Ürün ve renk bazında (bedenler tek satırda toplanır)</option><option value="product"' + (o.xgroup === 'product' ? ' selected' : '') + '>Ürün bazında (renk ve bedenler tek satırda toplanır)</option></select>') : '') + '<div class="muted" style="font-size:12px">Toplanan satırda adetler toplanır, tutar ve indirimler birleşir. Belge toplamları, KDV dökümü ve stok değişmez; yalnızca fişin görünümü etkilenir.</div></div>' +
     '<div class="pgrp" style="margin-bottom:12px"><div class="pgt">Fişte gösterilecek bilgiler</div><div class="permgrid">' +
       chk('addr', 'Adres') + chk('phone', 'Telefon') + chk('tax', 'Vergi dairesi / no') + chk('cari', 'Cari adı') + chk('user', 'İşlemi yapan kullanıcı') + chk('vat', 'KDV dökümü (KDV hariç ve oranlara göre KDV)') + chk('pays', 'Ödeme yöntemi satırları') + chk('disc', '“… indirim kazandınız” özeti (satışta)') + chk('notice', '“Bilgi fişidir, mali değeri yoktur” uyarısı') +
     '</div></div>' +
@@ -5030,8 +5041,12 @@ function rcptFx(x, part){                                      // fiş: döviz t
   if(x.chg) h += '<div class="rr"><span>&nbsp;&nbsp;Para üstü</span><span>' + esc(fm(x.chg.a, x.chg.c)) + '</span></div>' + (x.chg.c !== 'TRY' ? '<div class="rr"><span>&nbsp;&nbsp;&nbsp;&nbsp;(TL karşılığı)</span><span>' + esc(money(x.chg.tl)) + '</span></div>' : '');
   return h;
 }
-function rcptDoc(x){
-  var vs = vatSplit(x.lines), rest = r2(x.total - x.paid), T = TYPES[x.type], pp = docPays(x), rc = rcOpt();
+function rcGroupChips(kind, id, g, lineCount){               // fiş penceresinde geçici gruplama düğmeleri (tasarım ayarını değiştirmez); tek satırlı fişte gösterilmez
+  if(lineCount < 2) return '';
+  return [['detail', 'Renk/beden detaylı'], ['color', 'Ürün + renk'], ['product', 'Ürün bazında']].map(function(k){ return '<button type="button" class="btn sm' + (g === k[0] ? ' pri' : '') + '" data-act="receipt" data-kind="' + kind + '" data-id="' + id + '" data-g="' + k[0] + '">' + k[1] + '</button>'; }).join('');
+}
+function rcptDoc(x, g){
+  var vs = vatSplit(x.lines), rest = r2(x.total - x.paid), T = TYPES[x.type], pp = docPays(x), rc = rcOpt(), gmode = (g === 'product' || g === 'color' || g === 'detail') ? g : rc.group;
   var h = rcptHead(rc.titles[x.type], x.no, x.date);
   if(x.refNo) h += '<div class="rr"><span>Bağlı belge</span><span>' + esc(x.refNo) + '</span></div>';
   if(x.cariId && rc.cari) h += '<div class="rr"><span>Cari</span><span>' + esc(cariName(x.cariId)) + '</span></div>';
@@ -5041,7 +5056,7 @@ function rcptDoc(x){
   h += '<hr>';
   var gSum = 0, cSum = 0, mSum = 0, dSum = 0;
   x.lines.forEach(function(l){ gSum += lg(l); cSum += num(l.cDisc); mSum += num(l.mDisc); dSum += num(l.gDisc); });
-  rcLines(x.lines, rc.group).forEach(function(o){
+  rcLines(x.lines, gmode).forEach(function(o){
     var p = prod(o.pid), vl = varLabel(o.cl, o.sz), pr = Object.keys(o.prices).length === 1 ? o.price : (o.qty ? r2(o.g / o.qty) : 0), mk = Object.keys(o.mdls);
     h += '<div>' + esc(p ? p.name : '(silinmiş)') + (vl ? ' (' + esc(vl) + ')' : '') + '</div><div class="rr"><span>' + qf(o.qty) + ' ' + esc(p ? p.unit : '') + ' x ' + money(pr) + ' (%' + num(o.vat) + ')</span><span>' + money(o.g) + '</span></div>';
     if(o.cD > 0) h += '<div class="rr"><span>&nbsp;&nbsp;Kampanya: ' + esc(o.camps.join(', ')) + '</span><span>−' + money(r2(o.cD)) + '</span></div>';
@@ -5094,11 +5109,13 @@ A.receipt = function(d){
     var tx = (db.transfers || []).find(function(y){ return y.id === d.id; }); if(!tx) return;
     var xg = (d.g === 'product' || d.g === 'color' || d.g === 'detail') ? d.g : rcOpt().xgroup;
     html = rcptXfer(tx, xg); name = 'transfer-' + tx.no;
-    xex = [['detail', 'Renk/beden detaylı'], ['color', 'Ürün + renk'], ['product', 'Ürün bazında']].map(function(k){ return '<button type="button" class="btn sm' + (xg === k[0] ? ' pri' : '') + '" data-act="receipt" data-kind="xfer" data-id="' + tx.id + '" data-g="' + k[0] + '">' + k[1] + '</button>'; }).join('');
+    xex = rcGroupChips('xfer', tx.id, xg, tx.lines.length);
   } else {
     var x = db.docs.find(function(y){ return y.id === d.id; }); if(!x) return;
     if(!can(DOC_VIEW[x.type])){ toast('Bu işlem için yetkiniz yok', 'err'); return; }
-    html = rcptDoc(x); name = 'fis-' + x.no;
+    var gd = (d.g === 'product' || d.g === 'color' || d.g === 'detail') ? d.g : rcOpt().group;
+    html = rcptDoc(x, gd); name = 'fis-' + x.no;
+    xex = rcGroupChips('doc', x.id, gd, x.lines.length);
   }
   lastRcpt = {html:html, name:name};
   modal('Fiş', html, null, null, xex + '<button type="button" class="btn" data-act="saveRcpt">Dosya olarak kaydet</button><button type="button" class="btn pri" data-act="printRcpt">Yazdır</button>');
@@ -5240,7 +5257,7 @@ A.delUser = function(d){
 A.myAccount = function(){
   var u = cur(); if(!u) return;
   modal('Hesabım',
-    '<div class="hint"><b>' + esc(u.name) + '</b> · ' + esc(u.username) + ' · ' + (u.role === 'admin' ? 'Yönetici' : 'Personel') + '<br><span class="muted">Sürüm: ' + esc(APP_VERSION) + '</span></div>' +
+    '<div class="hint"><b>' + esc(u.name) + '</b> · ' + esc(u.username) + ' · ' + (u.role === 'admin' ? 'Yönetici' : 'Personel') + '<br><span class="muted">Sürüm: ' + esc(APP_VERSION) + (SRV ? ' · Sunucu: ' + esc(sync.build || 'eski (bilgi yok)') : '') + '</span>' + (srvOutdated() ? '<br><b class="neg">Sunucu güncel değil; sunucu klasörünü yeni sürümle değiştirip yeniden başlatın.</b>' : '') + '</div>' +
     '<div class="row-end" style="justify-content:flex-start;margin:0 0 14px"><button type="button" class="btn danger" data-act="logout">Oturumu kapat</button><button type="button" class="btn" data-act="theme">Tema değiştir</button><button type="button" class="btn" data-act="hardRefresh">Uygulamayı yenile</button></div>' +
     (!SRV && u.role === 'admin' ? '<h3 style="font-size:15px">Kurtarma kodu</h3><div class="muted" style="font-size:13px;margin-bottom:6px">' + (db.settings.recovery ? 'Oluşturuldu (' + fd(db.settings.recovery.created) + '). Şifrenizi unutursanız giriş ekranından “Şifremi unuttum” ile kullanılır. Yeni kod oluşturursanız eskisi geçersiz olur.' : '<span class="neg">Henüz oluşturulmadı.</span> Şifrenizi unutursanız kurtarma kodu olmadan giriş yapamazsınız.') + '</div><div class="row-end" style="justify-content:flex-start;margin:0 0 14px"><button type="button" class="btn" data-act="rcNew">' + (db.settings.recovery ? 'Yeni kurtarma kodu oluştur' : 'Kurtarma kodu oluştur') + '</button></div>' : '') +
     '<h3 style="font-size:15px">Şifre değiştir</h3>' +
@@ -5473,6 +5490,8 @@ async function loadSnapshot(userId){
   if(userId) sessId = userId;
   ensureAttrVals();                                          // yerel düzenleme; sunucuya fark olarak gönderilmez
   sync.snap = snapRows(); sync.since = r.ver; sync.pending = 0; sync.retry = 0; setSyncState('ok');
+  sync.build = r.build || '';
+  if(srvOutdated()) setTimeout(function(){ toast('Sunucu güncel değil (' + (sync.build || 'eski sürüm') + '). Sunucu klasörünü yeni sürümle değiştirip yeniden başlatın.', 'err'); render(); }, 800);
 }
 function canon(v){
   if(Array.isArray(v)) return v.length ? v.map(canon) : undefined;                  // boş liste ile eksik alan aynı sayılır
