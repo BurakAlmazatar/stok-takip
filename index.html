@@ -151,7 +151,7 @@ label.f>input,label.f>select,label.f>textarea{margin-top:4px;font-weight:400}
 .sync i{font-style:normal;color:var(--sale)}
 .sync.busy i,.sync.dirty i{color:var(--warn)}
 .sync.err{color:var(--danger);font-weight:600}.sync.err i{color:var(--danger)}
-@media(max-width:640px){.sync b{display:none}}
+@media(max-width:640px){.top{display:grid;grid-template-columns:auto auto minmax(0,1fr) auto;column-gap:8px;row-gap:3px;padding:8px 12px;align-items:center}.top .menubtn{grid-column:1;grid-row:1/3}.top #logo{grid-column:2;grid-row:1/3}.top .brand{grid-column:3;grid-row:1;min-width:0;overflow-wrap:anywhere}.top #lang{grid-column:3;grid-row:2;margin:0;justify-self:start}.top #lang button{padding:3px 8px;font-size:11px}.top #usr{grid-column:4;grid-row:1/3;max-width:40vw}} @media(max-width:640px){.sync b{display:none}}
 .top .spacer{display:none}
 .cols3{display:grid;gap:0 12px;grid-template-columns:repeat(3,1fr)}
 @media(max-width:480px){.cols3{grid-template-columns:1fr}}
@@ -240,7 +240,7 @@ label.f>input,label.f>select,label.f>textarea{margin-top:4px;font-weight:400}
 var UILANG = (function(){ try{ var l = localStorage.getItem('stokcari_lang'); return l === 'en' || l === 'ru' ? l : 'tr'; }catch(e){ return 'tr'; } })();
 var NUMLOC = UILANG === 'en' ? 'en-US' : UILANG === 'ru' ? 'ru-RU' : 'tr-TR';
 var KEY = 'stokcari_v1';
-var APP_VERSION = '2026.10.25-35';
+var APP_VERSION = '2026.10.25-36';
 function defaults(){ return {products:[],caris:[],docs:[],payments:[],moves:[],counters:{sale:0,purchase:0},seq:1,users:[],campaigns:[],rates:[],locs:[],transfers:[],orders:[],settings:{name:'',phone:'',address:'',taxNo:'',footer:'',logo:'',logoRcpt:false,attrVals:[[],[],[],[],[]]}}; }
 function load(){
   try{ var s = localStorage.getItem(KEY); if(s){ var o = JSON.parse(s); return Object.assign(defaults(), o); } }catch(e){}
