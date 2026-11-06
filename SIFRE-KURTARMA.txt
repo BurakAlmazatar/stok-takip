@@ -43,4 +43,4 @@ Sifrenizi unuttuysaniz kayitlariniz silinmez; sifreyi asagidaki yollardan biriyl
    baglantisini kullanin; bu baglanti sayfayi uygulamanin kendi icinde acar.
    Yedek dosyaniz (JSON) varsa alternatif: bir tarayicida "Yedek dosyasindan basla" ile yukleyip 2. adimi uygulayin.
 
-
+Not: Sunucu (SQL Server) surumunde sifreyi yonetici sifirlar; sunucu klasorundeki sifre-sifirla.bat kullanilir.
