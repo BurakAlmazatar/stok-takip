@@ -1,122 +1,100 @@
-[README.md](https://github.com/user-attachments/files/34246666/README.md)
-<div align="center">
-  <img src="icon-192.png" alt="Stok ve Cari Takip logosu" width="110" />
+[README.md](https://github.com/user-attachments/files/34500852/README.md)
+# Stok ve Cari Takip — GitHub (Yerel) Sürümü
 
-# 📦 Stok ve Cari Takip
+**Sürüm:** `2026.10.25-47`
 
-![PWA](https://img.shields.io/badge/PWA-Destekli-2456db) ![Dil](https://img.shields.io/badge/Dil-T%C3%BCrk%C3%A7e-2456db) ![Platform](https://img.shields.io/badge/Platform-Web%20%7C%20Mobil-2456db)
-</div>
+Stok, cari hesap, satış/alış, sipariş, kampanya ve etiket yönetimi için **tek dosyalık web uygulaması**. Sunucu ve veritabanı gerekmez: uygulama GitHub Pages ile yayınlanır, kayıtlar **kullandığınız tarayıcıda** saklanır. Telefona uygulama gibi eklenebilir (PWA) ve internet olmadan da açılır.
 
-**Stok ve Cari Takip**, satış, alış, stok hareketleri ve cari hesap işlemlerini tek ekrandan yönetmeye yönelik Türkçe, mobil uyumlu bir web uygulamasıdır. **Progressive Web App (PWA)** desteğiyle uygun tarayıcılarda bilgisayar ve telefon ana ekranına eklenebilir; ilk çevrimiçi yüklemeden sonra uygulama kabuğu çevrimdışı da açılabilir.
-
-> **Önemli:** Bu depodaki dosyalar GitHub Pages üzerinde **yerel/tarayıcı modunda** çalışır. Veriler otomatik olarak farklı cihazlar arasında eşitlenmez. Kodda ayrıca `/api/` uç noktalarını kullanan bir sunucu modu bulunur; ancak bu pakette sunucu uygulaması yer almamaktadır.
-
-## Özellikler
-
-- **Satış ve alış:** Perakende ve toptan satış, ayrı belge serileri, satış/alış belgeleri, satış ve alış iadeleri, satır/genel iskonto ve ödeme türleri.
-- **Ürün yönetimi:** Ürün kartları, renk/beden varyantları, varyant bazlı barkodlar, ürün özellikleri ve Excel’den toplu ürün aktarımı.
-- **Kampanyalar:** Ürün veya özellik kapsamlı kampanyalar, yüzde/tutar indirimi, sabit fiyat ve çoklu alım kampanyaları; perakende/toptan veya seçili cari kapsamı.
-- **Stok takibi:** Stok giriş/çıkışları, stok hareketleri ve kritik stok takibi.
-- **Cari hesaplar:** Cari kartları, perakende müşteri yönetimi, bakiyeler, ekstreler, tahsilat ve ödemeler.
-- **Döviz:** TRY, USD ve EUR işlemleri; yerel modda kur girişi elle yapılır.
-- **Raporlama:** Satış, alış, kasa, ödeme ve kârlılık yetkilerine bağlı raporlar.
-- **Kullanıcı yetkileri:** Yönetici ve kullanıcı bazlı menü/işlem izinleri; kasiyer, satış, depo ve muhasebe yetki şablonları.
-- **Etiket ve fiş:** EAN-13 otomatik barkod üretimi, eksik barkodları tamamlama, toplu etiket basımı ve yazdırılabilir fişler.
-- **Güvenlik ve hesap kurtarma:** Kullanıcıya özel yetkiler, şifre kurtarma kodu ve kayıt düzenleme izinleri.
-- **Görünüm:** Mobil uyumlu arayüz, açık/koyu tema ve PWA simgeleri.
-- **Yedekleme:** Yerel verilerin yedeklenmesi ve yedekten geri yüklenmesi.
-
-## Dosya yapısı
-
-```text
-stok-ve-cari-takip/
-├── index.html                # Uygulamanın arayüzü ve istemci kodu
-├── manifest.webmanifest      # PWA adı, görünümü ve simgeleri
-├── sw.js                     # Çevrimdışı önbellek ve güncelleme yönetimi
-├── icon-192.png              # 192×192 uygulama simgesi
-├── icon-512.png              # 512×512 uygulama simgesi
-├── icon-maskable-512.png     # Android uyarlanabilir simge
-├── apple-touch-icon.png      # iPhone/iPad ana ekran simgesi
-├── favicon-32.png            # Tarayıcı sekmesi simgesi
-├── KURULUM.txt               # Ayrıntılı kurulum yönergeleri (isteğe bağlı)
-└── README.md                 # Bu doküman
-```
-
-**Dosya adları önemlidir.** Yüklenen dosyalarda `(1)`, `(2)` veya `(4)` gibi ekler varsa GitHub'a yüklemeden önce yukarıdaki adlarla yeniden adlandırın. Özellikle `index.html`, `sw.js` ve `manifest.webmanifest` adları kod içindeki referanslarla aynı olmalıdır.
-
-## GitHub Pages ile kurulum
-
-1. [github.com](https://github.com) üzerinde yeni bir **Public** repository oluşturun (örnek: `stok-takip`).
-2. Yukarıdaki uygulama dosyalarını **deponun kök dizinine**, tek tek yükleyin. ZIP dosyasını doğrudan yüklemeyin.
-3. **Settings → Pages** bölümüne girin.
-4. **Build and deployment → Source:** `Deploy from a branch` seçin.
-5. **Branch:** `main`, klasör: `/ (root)` seçip **Save** düğmesine basın.
-6. Yayın işlemi tamamlanınca uygulamayı aşağıdaki örnek biçimdeki adresten açın:
-
-```text
-https://KULLANICIADINIZ.github.io/stok-takip/
-```
-
-GitHub Pages yalnızca statik dosyaları barındırır; bu kurulum kendi başına merkezi veritabanı veya çok cihazlı canlı senkronizasyon sağlamaz.
-
-## Uygulama olarak yükleme
-
-| Platform | İşlem |
-|---|---|
-| Android / Chrome | Siteyi açın → üç nokta menüsü → **Uygulamayı yükle** veya **Ana ekrana ekle** |
-| iPhone / Safari | Siteyi açın → **Paylaş** → **Ana Ekrana Ekle** |
-| Windows / Chrome veya Edge | Siteyi açın → adres çubuğundaki yükleme simgesi veya tarayıcı menüsünden uygulama yükleme seçeneği |
-
-İlk açılışta internet bağlantısı gereklidir. `sw.js`, uygulamanın temel dosyalarını önbelleğe alarak sonraki çevrimdışı açılışlara yardımcı olur. Çevrimdışı çalışabilirlik, dosyaların daha önce başarıyla önbelleğe alınmış olmasına ve tarayıcı koşullarına bağlıdır.
-
-## Veri saklama ve cihazlar arası kullanım
-
-GitHub Pages sürümünde veriler tarayıcının **localStorage** alanında tutulur (`stokcari_v1` anahtarı). Bu nedenle:
-
-- Bilgisayar ve telefonun verileri **ayrıdır**; otomatik senkronizasyon yapılmaz.
-- Başka bir tarayıcı veya yeni cihaz aynı kayıtları kendiliğinden göstermez.
-- Tarayıcı site verilerini silmek kayıt kaybına neden olabilir.
-- Adres/alan adı değişikliklerinden önce yedek alınmalıdır.
-- iPhone'da Safari ve ana ekrana eklenen uygulamanın veri alanları farklı olabilir.
-
-### Bilgisayardan telefona veri taşıma
-
-1. Bilgisayardaki uygulamada **Ayarlar → Yedek dosyası indir** ile JSON yedeği oluşturun.
-2. Dosyayı güvenli bir yöntemle telefona aktarın.
-3. Telefonda uygulamayı açın. İlk kurulumda **Yedek dosyasından başla** seçeneğini kullanın; kurulum tamamlandıysa **Ayarlar → Dosyadan geri yükle** bölümünden içe aktarın.
-4. iPhone'da ana ekran uygulamasını kullanacaksanız, **önce ana ekrana ekleyin**, ardından yedeği ana ekran uygulamasının içinden yükleyin.
-
-Bu işlem **tek seferlik veri aktarımıdır**, canlı senkronizasyon değildir. Yedek dosyaları ticari ve kişisel kayıtlar içerebilir; güvenli saklayın.
-
-## Güncelleme
-
-Uygulama kodu değiştiğinde GitHub deposundaki `index.html` dosyasını güncelleyin. Gerekirse diğer değişen dosyaları da yükleyin. Sayfa yenilendiğinde servis çalışanı önce ağdan güncel sayfayı almaya çalışır; bağlantı yoksa önbellekteki kopyaya döner.
-
-Önbellek sürümü `sw.js` içindeki `CACHE` sabitiyle yönetilir (`stokcari-v2`). Önbellek davranışını değiştirdiğiniz sürümlerde bu adı artırabilirsiniz. **Önbelleği temizlemek ile tarayıcı/site verilerini silmek aynı şey değildir:** kayıtları korumak için güncellemeden önce yedek alın ve site verilerini gelişigüzel silmeyin.
-
-## Teknik notlar
-
-- **Tek sayfa uygulaması:** HTML, CSS ve JavaScript kodu `index.html` içindedir.
-- **PWA:** `manifest.webmanifest` ve `sw.js` kullanılır.
-- **Service worker:** Gezinti isteklerinde önce ağ, ağ yoksa önbellek yaklaşımı uygulanır; aynı kökendeki statik dosyalarda önbellek önceliklidir. `/api/` istekleri service worker tarafından önbelleğe alınmaz.
-- **Sunucu modu:** Kod `/api/ping` yanıtıyla sunucu desteğini algılayabilir; bu depodaki statik dosyalar tek başına API sunucusu kurmaz.
-- **Tarayıcı desteği:** Güncel Chrome, Edge ve Safari gibi modern tarayıcılar hedeflenir. Kurulum ve çevrimdışı özellikler tarayıcıya göre farklılık gösterebilir.
-
-## Sorun giderme
-
-| Sorun | Kontrol |
-|---|---|
-| Sayfa açılmıyor | GitHub Pages ayarlarını, yayın adresini ve `index.html` adını kontrol edin. |
-| Simge görünmüyor | Manifestteki simge adlarıyla yüklenen PNG adlarının eşleştiğini doğrulayın. |
-| Çevrimdışı açılmıyor | Uygulamayı önce internet varken açın; `sw.js` dosyasının erişilebilir olduğunu kontrol edin. |
-| Telefonda kayıtlar yok | Her cihazın ayrı depolama kullandığını unutmayın; JSON yedeğini telefona aktarın. |
-| Güncelleme görünmüyor | Sayfayı yenileyin, gerekirse `sw.js` önbellek sürümünü değiştirin. Önce yedek alın. |
-| Sunucu bağlantı hatası | Bu statik GitHub Pages paketinde API sunucusu yoktur; sunucu modu ayrı bir kurulum gerektirir. |
-
-## Güvenlik ve kullanım uyarısı
-
-Bu uygulamada ticari kayıtlar, cari bilgiler ve kullanıcı verileri tutulabilir. Yerel tarayıcı depolaması, merkezi veritabanı veya düzenli sunucu yedeği yerine geçmez. Cihaz erişimini koruyun, yedekleri güvenli saklayın ve üretim kullanımı öncesinde yetkilendirme, veri bütünlüğü ve kurtarma senaryolarını test edin.
+> Adım adım GitHub kurulumu için **`KURULUM.txt`**, şifre kurtarma için **`SIFRE-KURTARMA.txt`** dosyalarına bakın. Bu README genel bir özet ve başvuru kaynağıdır.
 
 ---
 
-**Dokümantasyon:** Mevcut README düzeni korunarak uygulamanın güncel `index.html`, PWA dosyaları ve `KURULUM.txt` bilgilerine göre güncellenmiştir.
+## Bu sürüm kime göre?
+
+| | GitHub (yerel) sürümü | Sunucu sürümü |
+|---|---|---|
+| Kayıtların yeri | Her cihazın **kendi tarayıcısı** | SQL Server (tek ortak veri) |
+| Birden çok cihaz/kullanıcı aynı anda | Hayır (her cihaz ayrı) | Evet |
+| Kurulum | Dosyaları GitHub'a yüklemek | Bilgisayara SQL Server + Node.js |
+| Mağaza / transfer | Yok (tek lokasyon gibi çalışır) | Var |
+| Çok sayıda ürün fotoğrafı | Sınırlı (~5 MB tarayıcı limiti) | Uygun |
+| Yedek | Elle (Ayarlar > Yedek) | SQL Server yedeği + otomatik |
+
+Tek kişi/tek cihaz ve basit kullanım için idealdir. Birden çok çalışan, mağaza veya cihaz aynı veriyi kullanacaksa **sunucu sürümüne** geçin (yedek dosyası `ithal-et.bat` ile taşınır).
+
+## Dosyalar
+
+| Dosya | Açıklama |
+|---|---|
+| `index.html` | Uygulamanın kendisi (sürüm numarası içinde) |
+| `manifest.webmanifest`, `sw.js` | Uygulama adı/rengi ve çevrimdışı çalışma |
+| `icon-*.png`, `apple-touch-icon.png`, `favicon-32.png` | Simgeler |
+| `sifre-sifirla.html` | İsteğe bağlı: konsol açamadığınızda şifre sıfırlama sayfası |
+| `KURULUM.txt`, `SIFRE-KURTARMA.txt` | Ayrıntılı kılavuzlar |
+| `README.md` | Bu dosya |
+
+## Hızlı kurulum
+
+1. github.com'da yeni bir **Public** depo açın (örn. `stok-takip`).
+2. Zip'i klasöre çıkarın; içindeki dosyaları **Add file > Upload files** ile yükleyin (zip'i olduğu gibi yüklemeyin). `README.md` ve `.txt` dosyaları yüklenebilir ya da atlanabilir.
+3. **Settings > Pages**: *Deploy from a branch*, branch `main`, klasör `/ (root)` → Save.
+4. 1-2 dakika sonra adres hazır: `https://KULLANICIADINIZ.github.io/stok-takip/`
+5. Telefonda: Android (Chrome) menü > *Uygulamayı yükle*; iPhone (Safari) Paylaş > *Ana Ekrana Ekle*. İlk açılışı internet varken yapın.
+
+> Veriler depoda değil, **kullanıcının tarayıcısında** durur; depoda yalnızca uygulama dosyaları olur.
+
+## Güncelleme
+
+1. Yeni zip'ten `index.html` dosyasını (ve değiştiyse `sw.js`, `manifest.webmanifest`) depoya aynı adla yükleyin.
+2. Uygulamada **Hesabım > Uygulamayı yenile** deyin (ya da sayfayı yenileyin). Kayıtlarınız silinmez.
+3. Sürüm numarası Hesabım penceresinde görünür; zip'teki sürümle aynı olduğunu kontrol edin.
+
+## Özellikler (özet)
+
+**Temel:** ürün kartları (özellik, renk/beden varyantı, varyant ve lot barkodu, KDV, kritik stok), cariler ve perakende müşteriler, ekstre ve bakiye, tahsilat/ödeme, stok girişi/çıkışı, kampanyalar, fiş yazdırma, Excel ve PDF raporları, çoklu kullanıcı ve yetkiler (aynı cihazda).
+
+**Satış:** perakende ve toptan satış, iade, belge ve makbuz düzenleme, kapanış kilidi, **satış sorumlusu** (parametreli) ve sorumlu raporu.
+
+**Sipariş, kapora, avans:** satış/alış siparişi, kısmi faturalama, **birden fazla siparişi tek faturada birleştirme**, kapora ve cari avansı, **dövizli (USD/EUR)** işlemler (kurlar elle girilir), sipariş ve avans raporları.
+
+**Barkod, lot, etiket:** EAN-13, varyant ve **lot barkodu**, **etiket tasarımcısı** (rulo/A4, sürükle-bırak, çoklu tasarım, üstü çizili kampanyalı fiyat, fiyat tarihi, yerli üretim logosu), **ürün fotoğrafı**.
+
+**Görünüm:** TR / EN / RU, 11 tema, menü adı ve simgeleri, yazı tipi/boyutu.
+
+## Yedekleme ve cihaz taşıma
+
+- Her cihazın kayıtları **ayrıdır**. Düzenli olarak **Ayarlar > Yedek dosyası indir** ile yedek alın. **Tarayıcı verisini temizlemek tüm kayıtları siler.**
+- Bilgisayardan telefona taşıma: bilgisayarda yedek indirin → telefona gönderin → telefonda ilk kurulum ekranında **"Yedek dosyasından başla"** ya da giriş yapınca **Ayarlar > Dosyadan geri yükle**. Bu bir senkronizasyon değildir; iki cihazda ayrı çalışırsanız kayıtlar ayrışır.
+- iPhone: ana ekrana eklenen uygulamanın kayıtları Safari'ninkinden **ayrıdır**; yedeği ana ekran simgesinden açıp **orada** yükleyin.
+- İndirme çalışmazsa Ayarlar > **Yedek metni oluştur** ile metni kopyalayıp Notlar'a yapıştırın.
+
+## Önemli notlar ve sınırlar
+
+- **Depolama sınırı ~5 MB:** çok sayıda ürün fotoğrafı bu sınırı doldurabilir; ürün kartında toplam fotoğraf boyutu gösterilir. Çok fotoğraf için sunucu sürümünü kullanın.
+- Aynı GitHub hesabındaki (`kullaniciadi.github.io`) tüm siteler tarayıcıda aynı depolama alanını paylaşır. Başka siteleriniz de varsa bu uygulama için ayrı hesap/kuruluş ya da kendi alan adınızı kullanın.
+- **Adres değişirse** (depo adı vb.) eski adresteki kayıtlar yeni adreste görünmez; önce yedek alın.
+- Lokasyon/transfer ve ortak veri bu sürümde yoktur (sunucu sürümüne özgü).
+- Etiketler tarayıcının yazdırma penceresinden basılır: ölçeği **%100** seçin, "sayfaya sığdır" ve üstbilgi/altbilgiyi kapatın; rulo yazıcıda kâğıt boyutu olarak etiket boyutunu seçin.
+
+## Şifre kurtarma (kısa)
+
+Kayıtlar silinmez; şifre yeniden belirlenebilir: giriş ekranında **"Şifremi unuttum"** (kurtarma koduyla) ya da `SIFRE-KURTARMA.txt` içindeki konsol komutu / `sifre-sifirla.html`. Kurtarma kodunu önceden **Hesabım > Kurtarma kodu oluştur** ile alıp saklayın.
+
+## Sürüm notları
+
+| Sürüm | Değişiklik |
+|---|---|
+| **-47** | Ürün fotoğrafı: yükleme, küçültme, satış/alış/sipariş/stok satırlarında küçük resim, resimli ürün seçici, etiket alanı |
+| **-46** | Etiket tasarımcısı: çoklu tasarım, sürükle-bırak yerleşim, rulo ve A4, üstü çizili kampanyalı fiyat, fiyat tarihi, yerli üretim logosu |
+| **-45** | Menü simgeleri; ürün kartında kampanyalı fiyat ve fiyat değişiklik tarihi; tarihli kampanyada kart fiyatını kullanma |
+| **-44** | 9 yeni tema |
+| **-43** | Satış sorumlusu (parametreli) ve sorumlu raporu |
+| **-42** | "Siparişi faturalaştır" her zaman görünür; görünenleri seç/kaldır |
+| **-41** | Aynı carinin birden fazla siparişini tek faturada birleştirme |
+| **-40** | Siparişler ekranında "Siparişi faturalaştır" penceresi |
+| **-39** | Toplu etiket: ürün/varyant barkodu ile lot barkodu türü seçimi |
+| **-38** | Satır editörlerinde elle lot seçimi |
+| **-37** | Lot (beden dağılımı) ve lot barkodu |
+| **-36** | Telefonda dil düğmeleri firma adının altına alındı |
+| **-35 / -34** | Fiş gruplama düğmeleri tek üründe de görünür; çeviri eklemeleri |
+| **-33** | Sipariş, kapora/avans, döviz, raporlar, TR/EN/RU dil, menü sığdırma, yazı tipi ayarları |
