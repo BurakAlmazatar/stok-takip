@@ -279,7 +279,7 @@ label.f>input,label.f>select,label.f>textarea{margin-top:4px;font-weight:400}
 var UILANG = (function(){ try{ var l = localStorage.getItem('stokcari_lang'); return l === 'en' || l === 'ru' ? l : 'tr'; }catch(e){ return 'tr'; } })();
 var NUMLOC = UILANG === 'en' ? 'en-US' : UILANG === 'ru' ? 'ru-RU' : 'tr-TR';
 var KEY = 'stokcari_v1';
-var APP_VERSION = '2026.10.25-57';
+var APP_VERSION = '2026.10.25-59';
 function defaults(){ return {products:[],caris:[],docs:[],payments:[],moves:[],counters:{sale:0,purchase:0},seq:1,users:[],campaigns:[],rates:[],locs:[],transfers:[],orders:[],settings:{name:'',phone:'',address:'',taxNo:'',footer:'',logo:'',logoRcpt:false,attrVals:[[],[],[],[],[]]}}; }
 function load(){
   try{ var s = localStorage.getItem(KEY); if(s){ var o = JSON.parse(s); return Object.assign(defaults(), o); } }catch(e){}
@@ -5241,7 +5241,7 @@ function sitePhotoUpload(file, pid){
     api('POST', '/api/siteimg/' + encodeURIComponent(pid) + '/' + idx, {data:url}).then(function(r){
       p.webImgs = r.n; state.siteImgV = (state.siteImgV || 0) + 1; commit(); siteGridRefresh(p); toast('Site fotoğrafı eklendi');
     }).catch(function(e){ toast(e.message || 'Fotoğraf yüklenemedi', 'err'); });
-  }, {tries:[[800, 0.82], [700, 0.74], [640, 0.66], [560, 0.58], [480, 0.5]], max:300000});
+  }, {tries:[[1200, 0.8], [1050, 0.72], [900, 0.64], [800, 0.58], [700, 0.5], [560, 0.45]], max:330000});
 }
 A.siteImgRm = function(d){
   var sp0 = $('#swpid'), pid = sp0 && sp0.value, p = pid ? prod(pid) : null; if(!p) return;
