@@ -1,26 +1,23 @@
-[README.md](https://github.com/user-attachments/files/34500852/README.md)
-# Stok ve Cari Takip — GitHub (Yerel) Sürümü
+[README.md](https://github.com/user-attachments/files/34691482/README.md)
+# Stok ve Cari Takip — GitHub Sürümü
 
-**Sürüm:** `2026.10.25-47`
+**Sürüm:** `2026.10.25-66`
 
-Stok, cari hesap, satış/alış, sipariş, kampanya ve etiket yönetimi için **tek dosyalık web uygulaması**. Sunucu ve veritabanı gerekmez: uygulama GitHub Pages ile yayınlanır, kayıtlar **kullandığınız tarayıcıda** saklanır. Telefona uygulama gibi eklenebilir (PWA) ve internet olmadan da açılır.
+Stok, cari hesap, satış/alış, sipariş, sayım, kampanya ve etiket yönetimi için **tek dosyalık web uygulaması**. Ek bir program ya da veritabanı gerekmez: uygulama GitHub Pages ile yayınlanır, kayıtlar **kullandığınız tarayıcıda** saklanır. Telefona uygulama gibi eklenebilir (PWA) ve **internet olmadan da açılır ve çalışır**.
 
 > Adım adım GitHub kurulumu için **`KURULUM.txt`**, şifre kurtarma için **`SIFRE-KURTARMA.txt`** dosyalarına bakın. Bu README genel bir özet ve başvuru kaynağıdır.
 
 ---
 
-## Bu sürüm kime göre?
+## Bu sürüm nasıl çalışır?
 
-| | GitHub (yerel) sürümü | Sunucu sürümü |
-|---|---|---|
-| Kayıtların yeri | Her cihazın **kendi tarayıcısı** | SQL Server (tek ortak veri) |
-| Birden çok cihaz/kullanıcı aynı anda | Hayır (her cihaz ayrı) | Evet |
-| Kurulum | Dosyaları GitHub'a yüklemek | Bilgisayara SQL Server + Node.js |
-| Mağaza / transfer | Yok (tek lokasyon gibi çalışır) | Var |
-| Çok sayıda ürün fotoğrafı | Sınırlı (~5 MB tarayıcı limiti) | Uygun |
-| Yedek | Elle (Ayarlar > Yedek) | SQL Server yedeği + otomatik |
+- Kayıtlar her cihazın **kendi tarayıcısında** saklanır. Her cihaz ayrı bir veri kümesidir; cihazlar arasında otomatik paylaşım yoktur.
+- Kurulum için yalnızca dosyaları GitHub'a yüklemek yeterlidir.
+- Mağaza/lokasyon ve transfer yoktur; uygulama tek lokasyon gibi çalışır.
+- Tarayıcı depolama sınırı (~5 MB) nedeniyle çok sayıda ürün fotoğrafı için uygun değildir.
+- Yedek elle alınır (Ayarlar > Yedek).
 
-Tek kişi/tek cihaz ve basit kullanım için idealdir. Birden çok çalışan, mağaza veya cihaz aynı veriyi kullanacaksa **sunucu sürümüne** geçin (yedek dosyası `ithal-et.bat` ile taşınır).
+Tek kişi/tek cihaz ve basit kullanım için idealdir.
 
 ## Dosyalar
 
@@ -57,7 +54,9 @@ Tek kişi/tek cihaz ve basit kullanım için idealdir. Birden çok çalışan, m
 
 **Sipariş, kapora, avans:** satış/alış siparişi, kısmi faturalama, **birden fazla siparişi tek faturada birleştirme**, kapora ve cari avansı, **dövizli (USD/EUR)** işlemler (kurlar elle girilir), sipariş ve avans raporları.
 
-**Barkod, lot, etiket:** EAN-13, varyant ve **lot barkodu**, **etiket tasarımcısı** (rulo/A4, sürükle-bırak, çoklu tasarım, üstü çizili kampanyalı fiyat, fiyat tarihi, yerli üretim logosu), **ürün fotoğrafı**.
+**Sayım:** **Sayım** menüsünden sayım fişi girilir (ürün ve renk/beden seçerek ya da **barkod okutarak**; her okutuş 1 adet ekler). Fişte sistem stoğu ve fark anında görünür. **“Sayıma göre stoğu eşitle”** ile stok sayılan adede çekilir; örneğin sistemde 10 kazak varken 8 sayıldıysa stok 8 olur ve fark **Stok hareketlerinde** `−2 · Sayım eşitleme · SY-0001 · Sistem 10 → sayılan 8` olarak görünür. Birden fazla açık fiş birlikte eşitlenebilir (adetler toplanır); isteğe bağlı **tam sayım** (sayılmayan ürünlerin stoğu 0'a eşitlenir); kapanış tarihi öncesine eşitleme yapılmaz; eşitleme fişten **geri alınabilir**. Sayım hareketleri stok hareketleri listesinden tek tek silinemez.
+
+**Barkod, lot, etiket:** EAN-13, varyant ve **lot barkodu**, **etiket tasarımcısı** (rulo/A4, sürükle-bırak, çoklu tasarım, üstü çizili kampanyalı fiyat, fiyat tarihi, yerli üretim logosu, lot içeriği tablosu, toptan fiyat), **ürün fotoğrafı**.
 
 **Görünüm:** TR / EN / RU, 11 tema, menü adı ve simgeleri, yazı tipi/boyutu.
 
@@ -70,10 +69,10 @@ Tek kişi/tek cihaz ve basit kullanım için idealdir. Birden çok çalışan, m
 
 ## Önemli notlar ve sınırlar
 
-- **Depolama sınırı ~5 MB:** çok sayıda ürün fotoğrafı bu sınırı doldurabilir; ürün kartında toplam fotoğraf boyutu gösterilir. Çok fotoğraf için sunucu sürümünü kullanın.
+- **Depolama sınırı ~5 MB:** çok sayıda ürün fotoğrafı bu sınırı doldurabilir; ürün kartında toplam fotoğraf boyutu gösterilir.
 - Aynı GitHub hesabındaki (`kullaniciadi.github.io`) tüm siteler tarayıcıda aynı depolama alanını paylaşır. Başka siteleriniz de varsa bu uygulama için ayrı hesap/kuruluş ya da kendi alan adınızı kullanın.
 - **Adres değişirse** (depo adı vb.) eski adresteki kayıtlar yeni adreste görünmez; önce yedek alın.
-- Lokasyon/transfer ve ortak veri bu sürümde yoktur (sunucu sürümüne özgü).
+- Mağaza/lokasyon, transfer ve cihazlar arası ortak veri bu sürümde yoktur.
 - Etiketler tarayıcının yazdırma penceresinden basılır: ölçeği **%100** seçin, "sayfaya sığdır" ve üstbilgi/altbilgiyi kapatın; rulo yazıcıda kâğıt boyutu olarak etiket boyutunu seçin.
 
 ## Şifre kurtarma (kısa)
@@ -84,6 +83,10 @@ Kayıtlar silinmez; şifre yeniden belirlenebilir: giriş ekranında **"Şifremi
 
 | Sürüm | Değişiklik |
 |---|---|
+| **-63 … -66** | Sürüm numarası güncellendi; bu sürümde işlevsel değişiklik yok |
+| **-62** | **Sayım menüsü:** sayım fişi girilir, “Sayıma göre stoğu eşitle” ile stok sayılan adede çekilir (sistem 10, sayılan 8 → −2) ve fark Stok hareketlerinde “Sayım eşitleme” olarak görünür; eşitleme geri alınabilir |
+| **-53** | Sipariş girişinde ürün seçimi düzeltildi (telefonda sığmıyordu; satıştaki gibi duyarlı satır, stok ve “siparişlere ayrılmış / kullanılabilir” bilgisi) |
+| **-48** | Menü yazısı hiç küçülmez (önce boşluklar azalır, sığmazsa menü kaydırılır); etiket tasarımında **lot içeriği** (bedenler yan yana, altında adetler), **toptan fiyat** alanı, Toptan ve Lot etiketi şablonları; bedenler doğal sırada (S M L XL, 4 8 10 12) |
 | **-47** | Ürün fotoğrafı: yükleme, küçültme, satış/alış/sipariş/stok satırlarında küçük resim, resimli ürün seçici, etiket alanı |
 | **-46** | Etiket tasarımcısı: çoklu tasarım, sürükle-bırak yerleşim, rulo ve A4, üstü çizili kampanyalı fiyat, fiyat tarihi, yerli üretim logosu |
 | **-45** | Menü simgeleri; ürün kartında kampanyalı fiyat ve fiyat değişiklik tarihi; tarihli kampanyada kart fiyatını kullanma |
